@@ -8,4 +8,5 @@ coverage/
 server/uploads/
 !.gitkeep
 .supabase/
-
+supabase/.branches/
+supabase/.temp/

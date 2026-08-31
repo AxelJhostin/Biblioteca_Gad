@@ -8,6 +8,11 @@
   ],
   "scripts": {
     "dev": "concurrently -n api,web -c green,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
+    "local:setup": "npm run supabase:start && npm run local:reset",
+    "local:reset": "supabase db reset && npm run db:seed",
+    "supabase:start": "supabase start",
+    "supabase:status": "supabase status",
+    "supabase:stop": "supabase stop",
     "build": "npm run build -w client",
     "test": "npm run test -w server && npm run test -w client",
     "test:coverage": "npm run test:coverage -w server && npm run test:coverage -w client",
@@ -18,6 +23,7 @@
   },
   "devDependencies": {
     "concurrently": "9.2.4",
+    "supabase": "2.116.0",
     "vitest": "4.1.11"
   },
   "overrides": {

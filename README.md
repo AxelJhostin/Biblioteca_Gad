@@ -83,11 +83,12 @@ cp server/.env.example server/.env
 cp client/.env.example client/.env
 ```
 
-Como mínimo, revise en `server/.env`:
+El archivo de ejemplo ya está preparado para Supabase local en Docker:
 
 ```env
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/biblioteca_municipal
-JWT_SECRET=un-secreto-largo-aleatorio-de-produccion
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres
+DB_SSL=false
+JWT_SECRET=biblioteca-local-jipijapa-2026-cambiar-en-produccion
 CLIENT_URL=http://localhost:5173
 ```
 
@@ -102,24 +103,51 @@ SUPABASE_SECRET_KEY=sb_secret_...
 
 Si Storage no está configurado, las portadas y PDF se guardan localmente bajo `server/uploads/` durante desarrollo.
 
-### 3. Base de datos
+### 3. Supabase local con Docker
 
-Cree una base PostgreSQL vacía y ejecute:
-
-```bash
-npm run db:migrate
-```
-
-La migración crea tablas, relaciones, restricciones, índices y RLS. Los roles `anon` y `authenticated` no reciben acceso directo a ninguna tabla de negocio.
-
-También puede usar el entorno local de Supabase si tiene Docker:
+La forma predeterminada de desarrollo es Supabase CLI local. Requiere Docker
+Desktop activo. La primera ejecución descarga las imágenes y puede tardar varios
+minutos:
 
 ```bash
-npx supabase start
-npx supabase db reset
+npm run local:setup
 ```
 
-No combine `supabase db push` y `npm run db:migrate` sobre la misma base sin revisar el historial: el proyecto usa `app_schema_migrations` para los despliegues ejecutados por Node.
+Este comando inicia Supabase, reconstruye la base con las migraciones y crea la
+cuenta administradora configurada en `server/.env`. Los reinicios normales no
+eliminan datos:
+
+```bash
+npm run supabase:start
+npm run dev
+```
+
+Para reconstruir deliberadamente la base desde cero:
+
+```bash
+npm run local:reset
+```
+
+Servicios locales principales:
+
+- Aplicación: `http://localhost:5173`
+- API Express: `http://localhost:4000`
+- Supabase API/Storage: `http://127.0.0.1:55321`
+- PostgreSQL: `127.0.0.1:55322`, base/usuario/contraseña `postgres`
+- Supabase Studio: `http://127.0.0.1:55323`
+
+El bloque `5532x` evita conflictos con otros proyectos Supabase locales que
+utilicen los puertos predeterminados `5432x`.
+
+Use `npm run supabase:status` para ver el estado y las claves locales, y
+`npm run supabase:stop` para detener los contenedores. Este entorno es solo para
+desarrollo y no debe exponerse a Internet.
+
+La migración crea tablas, relaciones, restricciones, índices y RLS. Los roles
+`anon` y `authenticated` no reciben acceso directo a ninguna tabla de negocio.
+No combine `supabase db reset` y `npm run db:migrate` sobre la misma base sin
+revisar el historial: para desarrollo local, Supabase CLI administra las
+migraciones de `supabase/migrations`.
 
 ### 4. Primera cuenta administradora
 
@@ -128,7 +156,7 @@ Defina en `server/.env`:
 ```env
 ADMIN_NAME=Administrador Biblioteca
 ADMIN_USER=admin
-ADMIN_PASSWORD=una-contraseña-temporal-segura
+ADMIN_PASSWORD="una-contraseña-temporal-segura"
 ```
 
 Luego ejecute:
@@ -154,6 +182,11 @@ npm run dev
 | Comando | Función |
 |---|---|
 | `npm run dev` | Inicia API y cliente en paralelo. |
+| `npm run local:setup` | Inicia Supabase, reconstruye la base y crea el administrador local. |
+| `npm run local:reset` | Reconstruye la base local y vuelve a crear el administrador. |
+| `npm run supabase:start` | Inicia los contenedores locales. |
+| `npm run supabase:status` | Muestra URLs y credenciales locales. |
+| `npm run supabase:stop` | Detiene los contenedores conservando los datos. |
 | `npm run build` | Genera el frontend optimizado en `client/dist`. |
 | `npm test` | Ejecuta pruebas del servidor y cliente. |
 | `npm run test:coverage` | Ejecuta las suites con cobertura. |
@@ -278,4 +311,3 @@ npx supabase migration new nombre_descriptivo
 ```
 
 No edite una migración que ya haya sido aplicada en producción; cree una nueva.
-
