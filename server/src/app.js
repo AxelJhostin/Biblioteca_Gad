@@ -17,6 +17,7 @@ export function createApp(overrides = {}) {
   const allowedOrigins = env.CLIENT_URL.split(',').map((origin) => origin.trim()).filter(Boolean);
 
   app.disable('x-powered-by');
+  if (env.NODE_ENV === 'production') app.set('trust proxy', 1);
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cors({ origin: env.NODE_ENV === 'test' ? true : allowedOrigins, credentials: false }));
   app.use(express.json({ limit: '1mb' }));
@@ -53,4 +54,3 @@ export function createApp(overrides = {}) {
   app.locals.dependencies = dependencies;
   return app;
 }
-

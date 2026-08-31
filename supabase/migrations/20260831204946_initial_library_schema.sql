@@ -195,12 +195,23 @@ alter table public.prestamos enable row level security;
 alter table public.prestamo_detalles enable row level security;
 alter table public.movimientos enable row level security;
 
-revoke all on table public.libros, public.autores, public.libro_autores,
-  public.archivos_digitales, public.clientes, public.cuentas_personal,
-  public.prestamos, public.prestamo_detalles, public.movimientos
-from anon, authenticated;
-
-revoke all on all sequences in schema public from anon, authenticated;
+do $$
+declare
+  api_role text;
+begin
+  foreach api_role in array array['anon', 'authenticated'] loop
+    if exists (select 1 from pg_catalog.pg_roles where rolname = api_role) then
+      execute format(
+        'revoke all on table public.libros, public.autores, public.libro_autores,
+         public.archivos_digitales, public.clientes, public.cuentas_personal,
+         public.prestamos, public.prestamo_detalles, public.movimientos from %I',
+        api_role
+      );
+      execute format('revoke all on all sequences in schema public from %I', api_role);
+    end if;
+  end loop;
+end;
+$$;
 revoke execute on function public.set_actualizado_en() from public;
 
 commit;

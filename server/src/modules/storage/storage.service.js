@@ -13,10 +13,19 @@ export function createStorageService(config) {
     ? createClient(config.supabaseUrl, config.supabaseSecretKey, { auth: { persistSession: false, autoRefreshToken: false } })
     : null;
 
+  async function ensureBucket(bucket) {
+    if (!client) return;
+    const { data } = await client.storage.getBucket(bucket);
+    if (data) return;
+    const { error } = await client.storage.createBucket(bucket, { public: false });
+    if (error && !/already exists/i.test(error.message)) throw error;
+  }
+
   return {
     async upload({ bucket, objectPath, buffer, contentType }) {
       const normalized = objectPath.split('/').map(safePathPart).join('/');
       if (client) {
+        await ensureBucket(bucket);
         const { error } = await client.storage.from(bucket).upload(normalized, buffer, {
           contentType,
           upsert: false,
@@ -44,4 +53,3 @@ export function createStorageService(config) {
     },
   };
 }
-

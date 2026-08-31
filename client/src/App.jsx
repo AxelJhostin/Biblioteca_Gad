@@ -1,22 +1,25 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Protected } from './state/AuthContext.jsx';
 import PublicLayout from './components/PublicLayout.jsx';
 import StaffLayout from './components/StaffLayout.jsx';
-import Catalog from './pages/public/Catalog.jsx';
-import BookDetail from './pages/public/BookDetail.jsx';
-import RequestLoan from './pages/public/RequestLoan.jsx';
-import RequestConfirmation from './pages/public/RequestConfirmation.jsx';
-import Reader from './pages/public/Reader.jsx';
-import Login from './pages/staff/Login.jsx';
-import Dashboard from './pages/staff/Dashboard.jsx';
-import Requests from './pages/staff/Requests.jsx';
-import Loans from './pages/staff/Loans.jsx';
-import AdminCatalog from './pages/staff/AdminCatalog.jsx';
-import StaffAccounts from './pages/staff/StaffAccounts.jsx';
-import Movements from './pages/staff/Movements.jsx';
+
+const Catalog = lazy(() => import('./pages/public/Catalog.jsx'));
+const BookDetail = lazy(() => import('./pages/public/BookDetail.jsx'));
+const RequestLoan = lazy(() => import('./pages/public/RequestLoan.jsx'));
+const RequestConfirmation = lazy(() => import('./pages/public/RequestConfirmation.jsx'));
+const Reader = lazy(() => import('./pages/public/Reader.jsx'));
+const Login = lazy(() => import('./pages/staff/Login.jsx'));
+const Dashboard = lazy(() => import('./pages/staff/Dashboard.jsx'));
+const Requests = lazy(() => import('./pages/staff/Requests.jsx'));
+const Loans = lazy(() => import('./pages/staff/Loans.jsx'));
+const AdminCatalog = lazy(() => import('./pages/staff/AdminCatalog.jsx'));
+const StaffAccounts = lazy(() => import('./pages/staff/StaffAccounts.jsx'));
+const Movements = lazy(() => import('./pages/staff/Movements.jsx'));
 
 export default function App() {
   return (
+    <Suspense fallback={<div className="page-loader"><span className="spinner-border text-success" /></div>}>
     <Routes>
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Catalog />} />
@@ -36,6 +39,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 }
-
