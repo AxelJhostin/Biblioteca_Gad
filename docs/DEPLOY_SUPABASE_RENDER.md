@@ -30,6 +30,7 @@ DATABASE_URL=postgresql://postgres.<project-ref>:<password>@aws-<region>.pooler.
 DB_SSL=true
 DB_SSL_REJECT_UNAUTHORIZED=true
 DB_POOL_MAX=5
+PICKUP_EXPIRY_DAYS=5
 CLIENT_URL=https://<frontend>.vercel.app
 SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_SECRET_KEY=sb_secret_...
@@ -48,7 +49,8 @@ en modo sesión**, puerto `5432`. Obtenga siempre la cadena actual desde
 
 `JWT_SECRET` lo genera Render y debe ser distinto del utilizado por
 Rehabilitación GAD. Los buckets se crean privados cuando se carga el primer
-archivo.
+archivo. `PICKUP_EXPIRY_DAYS` define cuántos días se reserva un material
+aprobado antes de marcar el retiro como vencido y liberar sus unidades.
 
 ## 3. Comprobación previa no destructiva de Supabase
 

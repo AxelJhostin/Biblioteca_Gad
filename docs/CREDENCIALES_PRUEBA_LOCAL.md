@@ -13,7 +13,7 @@ Estas cuentas existen únicamente para probar el Sistema de Biblioteca Municipal
 
 | Rol | Usuario o cédula | Contraseña | Acceso |
 |---|---|---|---|
-| Cliente | `1301000001` | `Lector#Demo2026` | Catálogo, solicitudes físicas y **Mi cuenta** |
+| Cliente | `1301000004` | `Lector#Demo2026` | Catálogo, solicitudes físicas y **Mi cuenta** |
 | Bibliotecaria | `bibliotecaria` | `Biblioteca#2026` | Solicitudes, préstamos, entregas, devoluciones, catálogo y clientes |
 | Administrador | `admin` | `Admin#Cambiar2026` | Todos los módulos, personal, movimientos y reportes |
 

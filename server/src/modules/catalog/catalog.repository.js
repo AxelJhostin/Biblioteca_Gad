@@ -1,6 +1,6 @@
 export function createCatalogRepository(db) {
   const availabilitySql = `
-    greatest(0, l.cantidad_total - coalesce((
+    greatest(0, l.cantidad_total - l.cantidad_no_disponible - coalesce((
       select sum(greatest(coalesce(d.cantidad_aprobada, d.cantidad_solicitada) - d.cantidad_devuelta, 0))::integer
       from public.prestamo_detalles d
       join public.prestamos p on p.id = d.prestamo_id
@@ -41,7 +41,7 @@ export function createCatalogRepository(db) {
       const { rows } = await db.query(
         `select l.id, l.id_libro_texto, l.tipo_material, l.tipo_material_otro,
                 l.genero, l.genero_otro, l.titulo, l.descripcion, l.anio_publicacion,
-                l.cantidad_total, l.portada_path is not null as tiene_portada,
+                l.cantidad_total, l.cantidad_no_disponible, l.portada_path is not null as tiene_portada,
                 l.digital_disponible, ${availabilitySql} as cantidad_disponible,
                 coalesce((select json_agg(json_build_object('id', a.id, 'nombre_completo', a.nombre_completo) order by la.orden)
                   from public.libro_autores la join public.autores a on a.id = la.autor_id

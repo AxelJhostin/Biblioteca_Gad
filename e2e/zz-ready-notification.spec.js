@@ -18,7 +18,7 @@ test('una revisión mixta notifica al cliente solo los materiales aprobados', as
   await expect(page.getByRole('heading', { name: 'Material listo para retirar' })).toBeVisible();
 
   await page.goto('/cuenta/login');
-  await page.getByLabel('Cédula').fill('1301000001');
+  await page.getByLabel('Cédula').fill('1301000004');
   await page.getByLabel('Contraseña', { exact: true }).fill('Lector#Demo2026');
   await page.getByRole('button', { name: 'Ingresar' }).click();
   await page.getByRole('link', { name: /Mi cuenta/ }).click();

@@ -2,10 +2,11 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../core/errors.js';
-import { cleanText, normalizeDocument } from '../../core/validation.js';
+import { cleanText, isValidEcuadorianId, normalizeDocument } from '../../core/validation.js';
 
 const identification = z.string().transform(normalizeDocument).pipe(
-  z.string().regex(/^\d{10}$/, 'La cédula debe contener exactamente 10 dígitos numéricos.'),
+  z.string().regex(/^\d{10}$/, 'La cédula debe contener exactamente 10 dígitos numéricos.')
+    .refine((value) => !/^\d{10}$/.test(value) || isValidEcuadorianId(value), 'Ingresa una cédula ecuatoriana válida.'),
 );
 const name = z.string().transform(cleanText).pipe(z.string()
   .min(3, 'Ingresa tu nombre completo.')
@@ -59,6 +60,14 @@ const passwordChangeSchema = z.object({
 });
 
 const staffPasswordSchema = z.object({ password }).passthrough();
+const accountStatusSchema = z.object({
+  estado: z.boolean(),
+  motivo: z.string().optional().default('').transform(cleanText).pipe(z.string().max(500)),
+}).superRefine((value, ctx) => {
+  if (!value.estado && value.motivo.length < 5) {
+    ctx.addIssue({ code: 'custom', path: ['motivo'], message: 'Explique brevemente por qué se inactiva la cuenta.' });
+  }
+});
 
 const genericCredentials = () => new AppError('Credenciales incorrectas o cuenta inactiva.', 401, 'INVALID_CLIENT_CREDENTIALS');
 const activationError = () => new AppError('No pudimos verificar los datos. Acércate a la biblioteca para activar tu cuenta.', 422, 'ACTIVATION_NOT_VERIFIED');
@@ -206,6 +215,24 @@ export function createClientAuthService({ repository, jwtSecret, jwtTtl }) {
         await repository.addMovement(tx, {
           tipo_actor: staff.rol, cliente_id: client.id, cuenta_personal_id: staff.id,
           actor_nombre: staff.nombre_completo, detalle: `Contraseña de cliente restablecida para cédula terminada en ${client.identificacion.slice(-4)}.`,
+        });
+        return { ...account, identificacion: client.identificacion, nombre_completo: client.nombre_completo };
+      });
+    },
+
+    async staffSetStatus(clientId, payload, staff) {
+      const input = accountStatusSchema.parse(payload);
+      return repository.transaction(async (tx) => {
+        const client = await repository.findClientByIdForUpdate(tx, clientId);
+        if (!client) throw new NotFoundError('Cliente no encontrado.');
+        if (!client.cuenta_id) throw new ValidationError('El cliente todavía no tiene una cuenta.');
+        const account = await repository.setClientAccountStatus(tx, client.cuenta_id, input, staff.id);
+        await repository.addMovement(tx, {
+          tipo_actor: staff.rol, cliente_id: client.id, cuenta_personal_id: staff.id,
+          actor_nombre: staff.nombre_completo,
+          detalle: input.estado
+            ? `Cuenta de cliente reactivada para cédula terminada en ${client.identificacion.slice(-4)}.`
+            : `Cuenta de cliente inactivada para cédula terminada en ${client.identificacion.slice(-4)}. Motivo: ${input.motivo}`,
         });
         return { ...account, identificacion: client.identificacion, nombre_completo: client.nombre_completo };
       });

@@ -7,6 +7,7 @@ import { formatDate, stateClass, stateLabel } from '../../lib/format.js';
 const stateHelp = {
   pendiente: 'La biblioteca todavía debe revisar esta solicitud.',
   listo_retiro: 'Tu solicitud fue aprobada. Acércate a la Biblioteca Municipal para retirar el material.',
+  expirado: 'El plazo de retiro terminó y los ejemplares fueron liberados.',
   activo: 'El material fue entregado y está pendiente de devolución.',
   atrasado: 'La fecha límite pasó y debes acercarte a la biblioteca.',
 };
@@ -22,7 +23,7 @@ export default function AccountDashboard() {
   return <div className="container py-4 py-md-5 client-account-page">
     <section className="account-welcome"><div><span className="eyebrow">Tu cuenta de biblioteca</span><h1>Hola, {user.nombre_completo.split(' ')[0]}</h1><p>Desde aquí puedes revisar tus préstamos y actualizar tus datos.</p><small className="account-identification">Cédula: {user.identificacion}</small></div><span className="account-avatar">{user.nombre_completo.charAt(0)}</span></section>
 
-    {!loading && readyForPickup.length > 0 && <section className="pickup-notification" role="status" aria-live="polite"><span className="pickup-notification-icon"><i className="fas fa-bell" /></span><div><span className="eyebrow">Aviso de la biblioteca</span><h2>¡Tienes materiales listos para retirar!</h2><p>Acércate a la Biblioteca Municipal. Revisa el detalle porque una solicitud puede tener materiales aprobados, reducidos o rechazados.</p><div className="pickup-notification-items">{readyForPickup.map((loan) => <Link key={loan.id} to={`/mi-cuenta/prestamos/${loan.id}`}><strong>{loan.codigo}</strong><span>{loan.detalles.filter((item) => Number(item.cantidad_aprobada) > 0).map((item) => `${item.titulo} (${item.cantidad_aprobada})`).join(', ')}</span><i className="fas fa-chevron-right" /></Link>)}</div></div></section>}
+    {!loading && readyForPickup.length > 0 && <section className="pickup-notification" role="status" aria-live="polite"><span className="pickup-notification-icon"><i className="fas fa-bell" /></span><div><span className="eyebrow">Aviso de la biblioteca</span><h2>¡Tienes materiales listos para retirar!</h2><p>Acércate antes de la fecha indicada. Revisa el detalle porque una solicitud puede tener materiales aprobados, reducidos o rechazados.</p><div className="pickup-notification-items">{readyForPickup.map((loan) => <Link key={loan.id} to={`/mi-cuenta/prestamos/${loan.id}`}><strong>{loan.codigo}</strong><span>{loan.detalles.filter((item) => Number(item.cantidad_aprobada) > 0).map((item) => `${item.titulo} (${item.cantidad_aprobada})`).join(', ')} · Hasta {formatDate(loan.fecha_expiracion_retiro)}</span><i className="fas fa-chevron-right" /></Link>)}</div></div></section>}
 
     <h2 className="h4 mb-3">¿Qué deseas hacer?</h2>
     <div className="account-main-actions">

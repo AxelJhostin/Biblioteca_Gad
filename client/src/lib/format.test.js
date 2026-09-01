@@ -6,4 +6,5 @@ test('mapea estados operativos a colores consistentes', () => {
   expect(stateClass('devuelto')).toBe('secondary');
   expect(stateClass('listo_retiro')).toBe('primary');
   expect(stateLabel('listo_retiro')).toBe('Listo para retirar');
+  expect(stateLabel('expirado')).toBe('Retiro vencido');
 });

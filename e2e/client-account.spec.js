@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('cliente inicia sesión, consulta su actividad y cierra sesión', async ({ page }) => {
   await page.goto('/cuenta/login');
-  await page.getByLabel('Cédula').fill('1301000001');
+  await page.getByLabel('Cédula').fill('1301000004');
   await page.getByLabel('Contraseña').fill('Lector#Demo2026');
   await page.getByRole('button', { name: 'Ingresar' }).click();
   await expect(page).toHaveURL(/\/$/);

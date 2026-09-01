@@ -29,13 +29,13 @@ export function createReportsRepository(db) {
         where.push(`l.genero = $${params.length}`);
       }
       if (filters.digital === 'true') where.push('l.digital_disponible = true');
-      if (filters.disponible === 'true') where.push(`greatest(0, l.cantidad_total - coalesce(stock.comprometida, 0)) > 0`);
+      if (filters.disponible === 'true') where.push(`greatest(0, l.cantidad_total - l.cantidad_no_disponible - coalesce(stock.comprometida, 0)) > 0`);
 
       const { rows } = await db.query(
         `select l.id_libro_texto, l.titulo, l.tipo_material, l.tipo_material_otro,
-                l.genero, l.genero_otro, l.anio_publicacion, l.cantidad_total,
+                l.genero, l.genero_otro, l.anio_publicacion, l.cantidad_total, l.cantidad_no_disponible,
                 l.digital_disponible,
-                greatest(0, l.cantidad_total - coalesce(stock.comprometida, 0))::integer as cantidad_disponible,
+                greatest(0, l.cantidad_total - l.cantidad_no_disponible - coalesce(stock.comprometida, 0))::integer as cantidad_disponible,
                 coalesce(stock.comprometida, 0)::integer as cantidad_comprometida,
                 coalesce((
                   select string_agg(a.nombre_completo, ', ' order by la.orden)

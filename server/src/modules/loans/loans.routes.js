@@ -49,6 +49,10 @@ export function createStaffLoanRoutes({ service, authenticate }) {
       item,
     });
   }));
+  router.post('/:id/corregir-revision', asyncHandler(async (req, res) => {
+    const item = await service.correctReview(req.params.id, req.body, req.user);
+    res.json({ ok: true, message: 'Revisión corregida y registrada en el historial.', item });
+  }));
   router.post('/:id/entregar', asyncHandler(async (req, res) => {
     const item = await service.deliver(req.params.id, req.body.fecha_limite, req.user);
     res.json({ ok: true, message: 'Entrega registrada.', item });
@@ -56,6 +60,14 @@ export function createStaffLoanRoutes({ service, authenticate }) {
   router.post('/:id/devoluciones', asyncHandler(async (req, res) => {
     const item = await service.registerReturn(req.params.id, req.body, req.user);
     res.json({ ok: true, message: 'Devolución registrada.', item });
+  }));
+  router.post('/:id/incidencias', asyncHandler(async (req, res) => {
+    const item = await service.registerIncident(req.params.id, req.body, req.user);
+    res.status(201).json({ ok: true, message: 'Incidencia registrada.', item });
+  }));
+  router.post('/incidencias/:incidentId/resolver', asyncHandler(async (req, res) => {
+    const item = await service.resolveIncident(req.params.incidentId, req.body, req.user);
+    res.json({ ok: true, message: 'Incidencia resuelta.', item });
   }));
   return router;
 }

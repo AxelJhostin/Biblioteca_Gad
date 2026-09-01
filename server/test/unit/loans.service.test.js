@@ -11,29 +11,44 @@ function fakeRepository(options = {}) {
   return {
     movements, lockedIds, transitions, addedDetails,
     transaction: (callback) => callback({}),
-    findClientById: async () => ({ id: 8, identificacion: '1300000000', nombre_completo: 'Ana Lectora' }),
-    upsertClient: async () => ({ id: 8, identificacion: '1300000000', nombre_completo: 'Ana Lectora' }),
+    findClientById: async () => ({ id: 8, identificacion: '1300000005', nombre_completo: 'Ana Lectora' }),
+    upsertClient: async () => ({ id: 8, identificacion: '1300000005', nombre_completo: 'Ana Lectora' }),
     hasOpenLoan: async () => Boolean(options.blocked),
     lockBooks: async (_tx, ids) => {
       lockedIds.push(...ids);
-      return ids.map((id) => ({ id, titulo: `Libro ${id}`, cantidad_total: options.totals?.[id] ?? 1, activo: true }));
+      return ids.map((id) => ({ id, titulo: `Libro ${id}`, cantidad_total: options.totals?.[id] ?? 1, cantidad_no_disponible: options.unavailable?.[id] ?? 0, activo: true }));
     },
     getCommittedByBook: async () => new Map(Object.entries(options.committed || {}).map(([id, quantity]) => [Number(id), quantity])),
     createLoan: async (_tx, input) => (created = { id: 10, codigo: 'SOL-ABC123', estado: input.state }),
     createDirectLoan: async (_tx, input) => (created = { id: 11, codigo: 'SOL-DIRECTO', estado: 'activo', ...input }),
     addDetails: async (_tx, _loanId, items) => addedDetails.push(...items),
     addMovement: async (_tx, movement) => movements.push(movement),
-    lockLoan: async () => options.missingLoan ? null : ({ id: 10, cliente_id: 8, estado: options.loanState || 'pendiente' }),
+    lockLoan: async () => options.missingLoan ? null : ({ id: 10, cliente_id: 8, estado: options.loanState || 'pendiente', fecha_limite: options.dueDate || '2099-12-31', fecha_expiracion_retiro: options.pickupExpiresAt }),
     getDetails: async () => options.details || [{ id: 30, libro_id: 1, titulo: 'Libro 1', cantidad_solicitada: 1, cantidad_aprobada: options.loanState === 'listo_retiro' ? 1 : null, cantidad_devuelta: 0 }],
     reviewDetail: async (_tx, detailId, approvedQuantity, reason) => transitions.push({ action: 'review-detail', detailId, approvedQuantity, reason }),
-    finishReview: async (_tx, loanId, staffId, state, reason) => transitions.push({ action: 'finish-review', loanId, staffId, state, reason }),
+    finishReview: async (_tx, loanId, staffId, state, reason, pickupExpiresAt) => transitions.push({ action: 'finish-review', loanId, staffId, state, reason, pickupExpiresAt }),
     deliver: async (_tx, loanId, staffId, dueDate) => transitions.push({ action: 'deliver', loanId, staffId, dueDate }),
+    updateReturnedQuantity: async (_tx, detailId, amount) => {
+      transitions.push({ action: 'return', detailId, amount });
+    },
+    setLoanState: async (_tx, loanId, state) => transitions.push({ action: 'loan-state', loanId, state }),
+    getOpenIncidentQuantity: async () => options.openLost || 0,
+    adjustBookUnavailable: async (_tx, bookId, unavailableDelta, totalDelta) => {
+      transitions.push({ action: 'adjust-stock', bookId, unavailableDelta, totalDelta });
+      return options.inventoryConflict ? null : { id: bookId };
+    },
+    createIncident: async (_tx, input) => ({ id: 90, estado: 'abierta', ...input }),
+    lockIncident: async () => options.incident || null,
+    resolveIncident: async (_tx, incidentId, resolution) => transitions.push({ action: 'resolve-incident', incidentId, resolution }),
+    lockExpiredReady: async () => options.expired || [],
+    expireReady: async (_tx, loanId) => transitions.push({ action: 'expire', loanId }),
+    markOverdue: async () => transitions.push({ action: 'mark-overdue' }),
     get created() { return created; },
   };
 }
 
 const payload = {
-  cliente: { identificacion: '1300000000', nombre_completo: 'Ana Lectora', telefono: '0990000000', correo: '' },
+  cliente: { identificacion: '1300000005', nombre_completo: 'Ana Lectora', telefono: '0990000000', correo: '' },
   items: [{ libro_id: 2, cantidad: 1 }, { libro_id: 1, cantidad: 1 }],
 };
 
@@ -173,6 +188,37 @@ test('la revisión permite aprobar algunos materiales, reducir cantidades y rech
   assert.ok(repository.transitions.some((transition) => transition.action === 'finish-review' && transition.state === 'listo_retiro'));
   assert.equal(repository.movements.filter((movement) => movement.tipo === 'prestamo').length, 1);
   assert.equal(repository.movements.filter((movement) => movement.tipo === 'rechazo_solicitud').length, 1);
+});
+
+test('la corrección auditada puede cambiar cantidades antes de la entrega', async () => {
+  const repository = fakeRepository({ loanState: 'listo_retiro', totals: { 1: 3 }, details: [
+    { id: 30, libro_id: 1, titulo: 'Libro 1', cantidad_solicitada: 3, cantidad_aprobada: 3, cantidad_devuelta: 0 },
+  ] });
+  const result = await createLoansService(repository).correctReview(10, {
+    motivo_correccion: 'Error al revisar la cantidad.',
+    items: [{ detalle_id: 30, cantidad_aprobada: 1, motivo_rechazo: 'Se autoriza una unidad.' }],
+  }, { id: 4, rol: 'bibliotecario', nombre_completo: 'María' });
+  assert.equal(result.estado, 'listo_retiro');
+  assert.ok(repository.movements.some((movement) => movement.tipo === 'correccion_prestamo'));
+  assert.ok(repository.transitions.some((transition) => transition.action === 'review-detail' && transition.approvedQuantity === 1));
+});
+
+test('el retiro aprobado incluye vencimiento y expira liberando las unidades', async () => {
+  const repository = fakeRepository({ expired: [{ id: 10, cliente_id: 8, codigo: 'SOL-VENCIDA' }] });
+  await createLoansService(repository, { pickupExpiryDays: 5 }).markOverdue();
+  assert.ok(repository.transitions.some((transition) => transition.action === 'expire' && transition.loanId === 10));
+  assert.ok(repository.movements.some((movement) => movement.tipo === 'cancelacion_retiro' && movement.tipo_actor === 'sistema'));
+});
+
+test('un ejemplar devuelto dañado se recibe y sale de circulación', async () => {
+  const details = [{ id: 30, libro_id: 1, titulo: 'Libro 1', cantidad_solicitada: 1, cantidad_aprobada: 1, cantidad_devuelta: 0 }];
+  const repository = fakeRepository({ loanState: 'activo', totals: { 1: 2 }, details });
+  const result = await createLoansService(repository).registerIncident(10, {
+    detalle_id: 30, tipo: 'danado', cantidad: 1, comentario: 'Cubierta desprendida.',
+  }, { id: 4, rol: 'bibliotecario', nombre_completo: 'María' });
+  assert.equal(result.prestamo_estado, 'devuelto');
+  assert.ok(repository.transitions.some((transition) => transition.action === 'adjust-stock' && transition.unavailableDelta === 1));
+  assert.ok(repository.movements.some((movement) => movement.tipo === 'incidencia'));
 });
 
 test('si el personal rechaza todas las líneas la solicitud completa queda rechazada', async () => {

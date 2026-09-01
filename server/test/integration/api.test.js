@@ -36,6 +36,7 @@ function dependencies() {
       listLoans: async () => [{ id: 5, codigo: 'SOL-UNO' }],
       getLoan: async () => ({ id: 5, codigo: 'SOL-UNO' }),
       updateProfile: async () => ({}), listClients: async () => [], staffActivate: async () => ({}), staffReset: async () => ({}),
+      staffSetStatus: async (_id, input) => ({ id: 2, estado: input.estado }),
     },
     storage: { download: async () => Buffer.from('file') },
     coversBucket: 'covers', digitalBucket: 'digital',
@@ -47,7 +48,9 @@ function dependencies() {
     loansService: {
       createClientRequest: async () => ({ rejected: false, loan: { codigo: 'SOL-UNO', estado: 'pendiente' } }),
       getClientStatus: async () => ({ codigo: 'SOL-UNO', estado: 'pendiente' }),
-      list: async () => [{ id: 7, codigo: 'SOL-COMPARTIDA' }], review: async () => ({ estado: 'listo_retiro', resumen: { aprobados: 1, rechazados: 1 } }), deliver: async () => ({ estado: 'activo' }), registerReturn: async () => ({}),
+      list: async () => [{ id: 7, codigo: 'SOL-COMPARTIDA' }], review: async () => ({ estado: 'listo_retiro', resumen: { aprobados: 1, rechazados: 1 } }),
+      correctReview: async () => ({ estado: 'listo_retiro' }), deliver: async () => ({ estado: 'activo' }), registerReturn: async () => ({}),
+      registerIncident: async () => ({ id: 9, estado: 'abierta' }), resolveIncident: async () => ({ id: 9, estado: 'resuelta' }),
       createDirectLoan: async () => ({ id: 5, codigo: 'SOL-DIRECTO', estado: 'activo' }),
     },
     adminService: { listStaff: async () => [], createBook: async () => ({}), updateBook: async () => ({}), uploadCover: async () => ({}), uploadDigital: async () => ({}), createStaff: async () => ({}), updateStaff: async () => ({}), resetPassword: async () => ({}) },
@@ -111,6 +114,16 @@ test('permite revisión mixta por HTTP antes de la entrega física', async () =>
   assert.equal(approval.body.item.resumen.rechazados, 1);
   const delivery = await request(app).post('/api/prestamos/5/entregar').set('Authorization', 'Bearer staff').send({ fecha_limite: '2099-12-31' }).expect(200);
   assert.equal(delivery.body.item.estado, 'activo');
+});
+
+test('expone correcciones, incidencias y bloqueo de cuenta solo al personal autenticado', async () => {
+  const app = createApp({ dependencies: dependencies() });
+  await request(app).post('/api/prestamos/5/corregir-revision').send({}).expect(401);
+  await request(app).post('/api/prestamos/5/corregir-revision').set('Authorization', 'Bearer librarian').send({}).expect(200);
+  await request(app).post('/api/prestamos/5/incidencias').set('Authorization', 'Bearer librarian').send({}).expect(201);
+  await request(app).post('/api/prestamos/incidencias/9/resolver').set('Authorization', 'Bearer staff').send({}).expect(200);
+  const status = await request(app).patch('/api/clientes/8/estado-cuenta').set('Authorization', 'Bearer librarian').send({ estado: false }).expect(200);
+  assert.equal(status.body.item.estado, false);
 });
 
 test('protege y entrega reportes institucionales como archivos adjuntos', async () => {

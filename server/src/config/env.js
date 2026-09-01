@@ -16,6 +16,7 @@ const schema = z.object({
   DB_POOL_MAX: z.coerce.number().int().positive().max(50).default(10),
   JWT_SECRET: z.string().min(24).default('desarrollo-biblioteca-cambiar-antes-produccion'),
   JWT_TTL: z.coerce.number().int().positive().default(3600),
+  PICKUP_EXPIRY_DAYS: z.coerce.number().int().min(1).max(30).default(5),
   SUPABASE_URL: z.string().optional().default(''),
   SUPABASE_SECRET_KEY: z.string().optional().default(''),
   SUPABASE_COVERS_BUCKET: z.string().default('biblioteca-portadas'),

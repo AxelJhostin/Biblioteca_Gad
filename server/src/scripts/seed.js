@@ -8,7 +8,7 @@ const password = process.env.ADMIN_PASSWORD;
 const librarianName = process.env.LIBRARIAN_NAME || 'Bibliotecaria de Pruebas';
 const librarianUser = process.env.LIBRARIAN_USER || 'bibliotecaria';
 const librarianPassword = process.env.LIBRARIAN_PASSWORD;
-const clientIdentification = process.env.CLIENT_DEMO_IDENTIFICATION || '1301000001';
+const clientIdentification = process.env.CLIENT_DEMO_IDENTIFICATION || '1301000004';
 const clientPassword = process.env.CLIENT_DEMO_PASSWORD;
 
 if (!password || password.length < 10) {

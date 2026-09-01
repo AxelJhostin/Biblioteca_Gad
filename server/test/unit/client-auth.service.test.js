@@ -7,7 +7,7 @@ const secret = 'secreto-de-pruebas-suficientemente-largo';
 
 function validRegistration() {
   return {
-    identificacion: '1301000099',
+    identificacion: '1301000095',
     nombre_completo: 'Ana Lectora',
     telefono: '0991000099',
     correo: '',
@@ -35,11 +35,17 @@ test('registra cliente y cuenta en una única transacción', async () => {
   assert.equal(service.verify(result.token).type, 'cliente');
 });
 
+test('rechaza una cédula con longitud correcta pero dígito verificador inválido', async () => {
+  const service = createClientAuthService({ repository: {}, jwtSecret: secret, jwtTtl: 3600 });
+  await assert.rejects(service.register({ ...validRegistration(), identificacion: '1301000001' }),
+    (error) => error.name === 'ZodError' && error.issues.some((issue) => issue.path[0] === 'identificacion'));
+});
+
 test('inicia sesión y rechaza tokens con versión anterior', async () => {
   const hash = await bcrypt.hash('Segura#2026', 4);
   let marked = false;
   const account = {
-    id: 3, cliente_id: 8, identificacion: '1301000099', nombre_completo: 'Ana Lectora',
+    id: 3, cliente_id: 8, identificacion: '1301000095', nombre_completo: 'Ana Lectora',
     telefono: '0991000099', correo: null, password_hash: hash, estado: true,
     debe_cambiar_password: false, version_sesion: 2, bloqueado_hasta: null,
   };
@@ -50,7 +56,7 @@ test('inicia sesión y rechaza tokens con versión anterior', async () => {
     findActiveById: async () => account,
   };
   const service = createClientAuthService({ repository, jwtSecret: secret, jwtTtl: 3600 });
-  const result = await service.login({ identificacion: '1301000099', password: 'Segura#2026' });
+  const result = await service.login({ identificacion: '1301000095', password: 'Segura#2026' });
   assert.equal(marked, true);
   assert.equal((await service.getSessionAccount(service.verify(result.token))).cliente_id, 8);
   assert.equal(await service.getSessionAccount({ sub: '3', role: 'cliente', type: 'cliente', ver: 1 }), null);
@@ -61,7 +67,7 @@ test('activa un cliente histórico sin crear otro registro de cliente', async ()
   const repository = {
     transaction: (callback) => callback({}),
     findClientForUpdate: async () => ({
-      id: 8, cuenta_id: null, identificacion: '1301000099', nombre_completo: 'Ana Lectora',
+      id: 8, cuenta_id: null, identificacion: '1301000095', nombre_completo: 'Ana Lectora',
       telefono: '0991000099', correo: 'ana@example.com',
     }),
     hasPreviousLoanCode: async (_tx, clientId, code) => clientId === 8 && code === 'SOL-ANTERIOR',
@@ -72,7 +78,7 @@ test('activa un cliente histórico sin crear otro registro de cliente', async ()
   };
   const service = createClientAuthService({ repository, jwtSecret: secret, jwtTtl: 3600 });
   const result = await service.activate({
-    identificacion: '1301000099', contacto: 'ana@example.com', codigo: 'SOL-ANTERIOR',
+    identificacion: '1301000095', contacto: 'ana@example.com', codigo: 'SOL-ANTERIOR',
     password: 'Segura#2026', confirmar_password: 'Segura#2026',
   });
   assert.equal(createdClientAccount.clientId, 8);
@@ -83,7 +89,7 @@ test('el restablecimiento por personal obliga a cambiar contraseña y registra m
   const movements = [];
   const repository = {
     transaction: (callback) => callback({}),
-    findClientByIdForUpdate: async () => ({ id: 8, cuenta_id: 3, identificacion: '1301000099', nombre_completo: 'Ana Lectora' }),
+    findClientByIdForUpdate: async () => ({ id: 8, cuenta_id: 3, identificacion: '1301000095', nombre_completo: 'Ana Lectora' }),
     resetClientPassword: async (_tx, accountId, passwordHash) => ({ id: accountId, cliente_id: 8, estado: true, debe_cambiar_password: true, version_sesion: 4, passwordHash }),
     addMovement: async (_tx, movement) => movements.push(movement),
   };
@@ -92,4 +98,23 @@ test('el restablecimiento por personal obliga a cambiar contraseña y registra m
   assert.equal(result.debe_cambiar_password, true);
   assert.equal(movements[0].tipo_actor, 'bibliotecario');
   assert.doesNotMatch(movements[0].detalle, /Temporal#2026/);
+});
+
+test('el personal inactiva una cuenta con motivo e invalida sus sesiones', async () => {
+  const movements = [];
+  let statusInput;
+  const repository = {
+    transaction: (callback) => callback({}),
+    findClientByIdForUpdate: async () => ({ id: 8, cuenta_id: 3, identificacion: '1301000095', nombre_completo: 'Ana Lectora' }),
+    setClientAccountStatus: async (_tx, _accountId, input) => {
+      statusInput = input;
+      return { id: 3, cliente_id: 8, estado: input.estado, version_sesion: 3 };
+    },
+    addMovement: async (_tx, movement) => movements.push(movement),
+  };
+  const service = createClientAuthService({ repository, jwtSecret: secret, jwtTtl: 3600 });
+  const result = await service.staffSetStatus(8, { estado: false, motivo: 'Solicitudes reiteradas sin retiro.' }, { id: 1, rol: 'administrador', nombre_completo: 'Admin' });
+  assert.equal(result.estado, false);
+  assert.equal(statusInput.motivo, 'Solicitudes reiteradas sin retiro.');
+  assert.match(movements[0].detalle, /inactivada/);
 });

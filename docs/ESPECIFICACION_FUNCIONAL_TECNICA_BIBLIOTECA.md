@@ -1,6 +1,6 @@
 # Especificación funcional y técnica — Sistema de Gestión de Biblioteca Municipal
 
-**Versión:** 1.4
+**Versión:** 1.5
 
 **Fecha:** 1 de septiembre de 2026
 
@@ -25,6 +25,7 @@ El sistema conservará la línea visual y la arquitectura de referencia de **Reh
 - Solicitud de préstamo físico exclusiva para una cuenta Cliente autenticada.
 - Autenticación separada para clientes y para bibliotecarios/administradores.
 - Revisión completa y mixta por material: aprobar, reducir cantidades o rechazar líneas; entrega y devolución de préstamos.
+- Expiración automática de retiros, corrección auditada e incidencias por daño, reparación, extravío o baja.
 - Bloqueo de nuevas solicitudes de un cliente que tenga material sin devolver vencido o activo.
 - Gestión administrativa de libros, autores, archivos digitales y cuentas de bibliotecarios.
 - Historial de movimientos de préstamos, devoluciones, ingresos, ediciones y rechazos.
@@ -132,6 +133,8 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 6. La cuenta del Cliente muestra un aviso interno destacado con el código y únicamente los materiales/cantidades aprobados. El historial siempre conserva y explica las líneas rechazadas. No se crea correo, WhatsApp, SMS ni otra notificación externa.
 7. Cuando el cliente se presenta, el bibliotecario abre **Préstamos**, usa **Registrar entrega**, define la fecha límite y confirma la entrega física. Solo las líneas aprobadas pasan a `activo`.
 8. Cada decisión, transición de entrega y devolución se ejecuta en una transacción y genera su Movimiento correspondiente.
+9. La aprobación vence después de `PICKUP_EXPIRY_DAYS` (5 días por defecto). El proceso horario cambia el estado a `expirado`, libera las unidades y registra un Movimiento del sistema.
+10. Antes de la entrega, Personal puede corregir una revisión con motivo obligatorio. La API vuelve a comprobar stock, préstamo abierto y todas las líneas; una corrección exitosa reinicia el plazo de retiro.
 
 ### 5.5 Devolución
 
@@ -140,6 +143,13 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 3. La API impide devolver más unidades de las que siguen pendientes.
 4. Al devolver parcialmente, las unidades devueltas vuelven a estar disponibles y el préstamo sigue `activo` o `atrasado` si aún vence.
 5. Cuando todas las líneas están devueltas, se registra la fecha real de devolución y el préstamo queda `devuelto`.
+
+### 5.5.1 Incidencias físicas
+
+1. Sobre un préstamo activo o atrasado, Personal selecciona material, cantidad y situación: dañado, reparación o extraviado.
+2. Dañado/reparación cuenta como recibido, pero aumenta `cantidad_no_disponible`; no vuelve al catálogo hasta resolverse.
+3. Extravío no cuenta como devolución y mantiene el préstamo abierto. Al recuperarse, se recibe; al darse de baja, se resuelve la línea y se reduce el inventario total.
+4. Una incidencia de daño/reparación se resuelve reintegrando el ejemplar o dándolo de baja. Cada acción deja actor, fecha y Movimiento.
 
 ### 5.5.1 Préstamo directo presencial
 
@@ -189,6 +199,12 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 | RN-17 | La API determina el propietario de una solicitud desde la sesión Cliente, nunca desde una cédula enviada en el formulario. |
 | RN-18 | El Cliente solo consulta su actividad; cambiar o restablecer contraseña invalida tokens anteriores mediante `version_sesion`. |
 | RN-19 | Bibliotecario y Administrador pueden consultar y exportar el historial completo de préstamos y solicitudes, independientemente de la cuenta de personal que los creó, revisó, entregó o devolvió. |
+| RN-20 | La cédula Cliente debe superar el algoritmo ecuatoriano de provincia, tipo y dígito verificador; diez dígitos por sí solos no son suficientes. |
+| RN-21 | Una aprobación no retirada expira después del plazo configurado, libera stock y no puede entregarse fuera de plazo. |
+| RN-22 | Toda corrección de revisión exige motivo, ocurre antes de la entrega, decide todas las líneas y vuelve a validar stock de forma transaccional. |
+| RN-23 | Dañados/reparación se descuentan como fuera de circulación; extraviados permanecen pendientes hasta recuperación o baja. |
+| RN-24 | Inactivar/reactivar una cuenta Cliente exige Personal autenticado, invalida sesiones y genera Movimiento; nunca borra el historial. |
+| RN-25 | No puede desactivarse un libro comprometido ni reducirse su total por debajo de unidades comprometidas más unidades fuera de circulación. |
 
 ## 7. Modelo de información
 
@@ -198,16 +214,17 @@ Los identificadores técnicos pueden ser enteros autogenerados. El **ID Libro** 
 
 | Entidad | Campos principales | Reglas / notas |
 |---|---|---|
-| `libros` | `id`, `id_libro_texto`, `tipo_material`, `genero`, `titulo`, `descripcion`, `anio_publicacion`, `cantidad_total`, `portada_ruta`, `digital_disponible`, `activo`, fechas | `id_libro_texto` es único y se mantiene como texto libre hasta confirmar el formato físico; total entero >= 0; portada opcional; disponibilidad calculada. |
+| `libros` | `id`, `id_libro_texto`, `tipo_material`, `genero`, `titulo`, `descripcion`, `anio_publicacion`, `cantidad_total`, `cantidad_no_disponible`, `portada_ruta`, `digital_disponible`, `activo`, fechas | Fuera de circulación nunca supera el total; portada opcional; disponibilidad calculada. |
 | `autores` | `id`, `nombre_completo`, fechas | Nombre obligatorio; se normaliza para evitar duplicados accidentales. |
 | `libro_autores` | `libro_id`, `autor_id`, `orden` | Relación muchos a muchos; pareja única. |
 | `archivos_digitales` | `id`, `libro_id`, `nombre_original`, `ruta_segura`, `mime_type`, `tamano_bytes`, `estado`, fechas | En V1, un archivo activo por libro; conservar versiones inactivas para historial. |
 | `clientes` | `id`, `identificacion`, `nombre_completo`, `telefono`, `correo`, fechas | No son cuentas. La identificación es una cédula ecuatoriana única de 10 dígitos. El nombre no admite números. Teléfono ecuatoriano o correo obligatorio. |
-| `cuentas_clientes` | `id`, `cliente_id`, `password_hash`, `estado`, `debe_cambiar_password`, `intentos_fallidos`, `bloqueado_hasta`, `version_sesion`, `ultimo_acceso`, fechas | Relación uno a uno con Cliente; hash bcrypt; bloqueo temporal e invalidación de sesiones por versión. RLS activa y sin privilegios para Data API. |
+| `cuentas_clientes` | `id`, `cliente_id`, `password_hash`, `estado`, `motivo_inactivacion`, `inactivada_en`, `inactivada_por`, `debe_cambiar_password`, `intentos_fallidos`, `bloqueado_hasta`, `version_sesion`, `ultimo_acceso`, fechas | Inactivación auditada e invalidación de sesiones por versión. RLS activa y sin privilegios para Data API. |
 | `cuentas_personal` | `id`, `nombre_completo`, `usuario`, `password_hash`, `rol`, `estado`, último acceso, fechas | Roles fijos: `bibliotecario`, `administrador`. Nunca se guarda contraseña en texto. |
-| `prestamos` | `id`, `codigo`, `cliente_id`, `bibliotecario_id`, `fecha_solicitud`, `fecha_aprobacion`, `fecha_entrega`, `fecha_limite`, `fecha_devolucion`, `estado`, `motivo_rechazo`, fechas | `codigo` visible al propietario y al personal; bibliotecario nulo hasta la revisión; una solicitud pendiente mantiene cantidades apartadas. |
+| `prestamos` | `id`, `codigo`, `cliente_id`, `bibliotecario_id`, `fecha_solicitud`, `fecha_aprobacion`, `fecha_expiracion_retiro`, `fecha_entrega`, `fecha_limite`, `fecha_devolucion`, `estado`, `motivo_rechazo`, fechas | Una aprobación requiere fecha de expiración y mantiene cantidades apartadas solo hasta retiro o vencimiento. |
 | `prestamo_detalles` | `id`, `prestamo_id`, `libro_id`, `cantidad_solicitada`, `cantidad_aprobada`, `motivo_rechazo`, `cantidad_devuelta`, `fecha_ultima_devolucion` | `cantidad_aprobada`: nula al pendiente, `0` al rechazo, positiva al aprobar total o parcialmente; nunca supera la solicitada. Solo las unidades aprobadas pueden entregarse/devolverse; no se eliminan líneas ya operadas. |
 | `movimientos` | `id`, `tipo`, `fecha_hora`, `tipo_actor`, `cliente_id`, `cuenta_personal_id`, `actor_nombre`, `libro_id`, `prestamo_id`, `detalle` | Historial funcional inmutable. Tipo: préstamo, devolución, ingreso de libro, edición de libro o rechazo de solicitud. El actor puede ser cliente, bibliotecario o administrador. |
+| `incidencias_prestamo` | préstamo, detalle, libro, tipo, cantidad, comentario, estado, responsables y fechas de registro/resolución | Conserva daño, reparación o extravío y su resolución como reintegro, recuperación o baja. RLS activa y sin acceso directo desde Data API. |
 
 ### 7.2 Relaciones
 
@@ -217,6 +234,7 @@ libros ──< archivos_digitales
 clientes ──< prestamos >── cuentas_personal
 clientes ── 0..1 cuentas_clientes
 prestamos ──< prestamo_detalles >── libros
+prestamos / prestamo_detalles ──< incidencias_prestamo >── libros
 clientes / cuentas_personal ──< movimientos >── libros / prestamos
 ```
 
@@ -225,11 +243,12 @@ clientes / cuentas_personal ──< movimientos >── libros / prestamos
 | Estado | Significado | Modifica disponibilidad | Transiciones permitidas |
 |---|---|:---:|---|
 | `pendiente` | Solicitud pública con al menos una línea a la espera de revisión; las líneas pendientes están apartadas por orden de llegada. | Sí | `listo_retiro`, `rechazado` |
-| `listo_retiro` | Solicitud con una o más líneas aprobadas y notificada internamente al Cliente; aún no existe entrega ni fecha límite. | Sí | `activo` |
+| `listo_retiro` | Solicitud aprobada y notificada; aparta unidades hasta la fecha de expiración. | Sí | `activo`, `expirado` |
 | `activo` | Aprobado y entregado físicamente. | Sí | `atrasado`, `devuelto` |
 | `atrasado` | Tiene unidades pendientes después de la fecha límite. | Sí | `devuelto` |
 | `devuelto` | Todas las unidades fueron recibidas. | No | Ninguna |
 | `rechazado` | Solicitud no aceptada, de forma manual o automática por falta de disponibilidad. | No | Ninguna |
+| `expirado` | Aprobación no retirada dentro del plazo; conserva historial y libera existencias. | No | Ninguna |
 
 El estado funcional de cada línea se deriva de `cantidad_aprobada`: pendiente (nula), rechazada (cero) o aprobada (positiva). El estado global “aprobado” se implementa como `listo_retiro` cuando existe al menos una línea aprobada, acompañado por `fecha_aprobacion`, `bibliotecario_id` y Movimientos. La interfaz separa revisión y entrega para que el Cliente sepa exactamente qué puede retirar. Tanto `pendiente` como `listo_retiro` apartan solo las unidades aplicables; esto no constituye una lista de espera ni un módulo general de reservas.
 
@@ -339,13 +358,17 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 | `GET` | `/api/clientes` | Bibliotecario/Admin | Buscar clientes y estado de cuenta. |
 | `POST` | `/api/clientes/:id/activar-cuenta` | Bibliotecario/Admin | Activar cuenta con contraseña temporal. |
 | `POST` | `/api/clientes/:id/restablecer-password` | Bibliotecario/Admin | Restablecer e invalidar sesiones anteriores. |
+| `PATCH` | `/api/clientes/:id/estado-cuenta` | Bibliotecario/Admin | Inactivar o reactivar una cuenta con motivo y trazabilidad. |
 | `POST` | `/api/auth/login` | Público | Login de personal. |
 | `GET` | `/api/auth/me` | Personal | Validar y recuperar sesión. |
 | `GET` | `/api/prestamos` | Bibliotecario/Admin | Listar el historial completo de solicitudes y préstamos por cualquiera de sus estados, sin filtro por cuenta de personal. |
 | `POST` | `/api/prestamos/directo` | Bibliotecario/Admin | Registrar y entregar un préstamo presencial en una transacción. |
 | `POST` | `/api/prestamos/:id/revisar` | Bibliotecario/Admin | Decidir atómicamente cada línea pendiente: aprobar total/parcial o rechazar; deja lista para retiro si existe una línea aprobada. |
+| `POST` | `/api/prestamos/:id/corregir-revision` | Bibliotecario/Admin | Corregir con motivo una revisión aún no entregada y volver a validar disponibilidad. |
 | `POST` | `/api/prestamos/:id/entregar` | Bibliotecario/Admin | Registrar retiro, fecha límite y activar el préstamo. |
 | `POST` | `/api/prestamos/:id/devoluciones` | Bibliotecario/Admin | Registrar devolución por líneas y cantidades. |
+| `POST` | `/api/prestamos/:id/incidencias` | Bibliotecario/Admin | Registrar daño, reparación o extravío sobre unidades pendientes. |
+| `POST` | `/api/prestamos/incidencias/:id/resolver` | Bibliotecario/Admin | Reintegrar, recuperar o dar de baja el ejemplar afectado. |
 | `GET` | `/api/admin/libros` | Admin | Catálogo administrativo. |
 | `POST/PATCH` | `/api/admin/libros[/:id]` | Admin | Crear o editar libro. |
 | `POST` | `/api/admin/libros/:id/digital` | Admin | Cargar o reemplazar archivo digital. |
@@ -376,7 +399,8 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 - JWT con secreto obligatorio en producción, vencimiento configurable y limpieza de sesión en el cliente si expira.
 - Autorización aplicada tanto en rutas de interfaz como en cada endpoint protegido.
 - Consultas SQL parametrizadas y validación estricta de identificadores, fechas, cantidades, archivos y estados.
-- Archivos digitales permitidos inicialmente: PDF. No se define un límite de tamaño a nivel de aplicación en esta versión; aplican únicamente las restricciones técnicas del proveedor de almacenamiento y despliegue.
+- Archivos digitales permitidos inicialmente: PDF. No se define un límite de tamaño a nivel de aplicación en esta versión; aplican únicamente las restricciones técnicas del proveedor de almacenamiento y despliegue. La carga comprueba MIME y firma binaria `%PDF-`.
+- Los accesos de Cliente y Personal tienen límites de frecuencia independientes; las respuestas no revelan si una cuenta existe.
 - Los archivos se almacenan con nombre interno aleatorio, tipo MIME validado y ruta no navegable directamente.
 - El visor utiliza endpoint controlado; se envían cabeceras `Content-Disposition: inline` y se evita toda opción de descarga creada por la aplicación.
 - La información de clientes se limita a identificación, nombre y contacto necesarios para la operación. No se muestran datos personales completos en el catálogo ni a terceros.

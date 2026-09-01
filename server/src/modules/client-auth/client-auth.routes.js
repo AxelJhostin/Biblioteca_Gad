@@ -60,6 +60,14 @@ export function createClientRoutes({ service, loansService, authenticateClient, 
     const item = await service.staffReset(req.params.id, req.body, req.user);
     res.json({ ok: true, message: 'Contraseña temporal establecida.', item });
   }));
+  router.patch('/:id/estado-cuenta', asyncHandler(async (req, res) => {
+    const item = await service.staffSetStatus(req.params.id, req.body, req.user);
+    res.json({
+      ok: true,
+      message: item.estado ? 'Cuenta de cliente reactivada.' : 'Cuenta de cliente inactivada.',
+      item,
+    });
+  }));
 
   return router;
 }

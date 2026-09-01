@@ -48,9 +48,9 @@ on conflict (libro_id, autor_id) do nothing;
 
 insert into public.clientes (identificacion, nombre_completo, telefono, correo)
 values
-  ('1301000001', 'Ana Mendoza', '0991000001', 'ana.demo@example.com'),
-  ('1301000002', 'Carlos Parrales', '052600002', 'carlos.demo@example.com'),
-  ('1301000003', 'Lucía Ponce', '0981000003', 'lucia.demo@example.com')
+  ('1301000004', 'Ana Mendoza', '0991000001', 'ana.demo@example.com'),
+  ('1301000012', 'Carlos Parrales', '052600002', 'carlos.demo@example.com'),
+  ('1301000020', 'Lucía Ponce', '0981000003', 'lucia.demo@example.com')
 on conflict (upper(identificacion)) do update set
   nombre_completo = excluded.nombre_completo,
   telefono = excluded.telefono,
@@ -58,12 +58,12 @@ on conflict (upper(identificacion)) do update set
 
 insert into public.prestamos (codigo, cliente_id, fecha_solicitud, estado)
 select 'SOL-DEMO-PEND', c.id, now() - interval '2 hours', 'pendiente'
-from public.clientes c where c.identificacion = '1301000001'
+from public.clientes c where c.identificacion = '1301000004'
 on conflict (codigo) do nothing;
 
 insert into public.prestamos (codigo, cliente_id, fecha_solicitud, estado, motivo_rechazo)
 select 'SOL-DEMO-RECH', c.id, now() - interval '3 days', 'rechazado', 'Ejemplo de solicitud rechazada.'
-from public.clientes c where c.identificacion = '1301000002'
+from public.clientes c where c.identificacion = '1301000012'
 on conflict (codigo) do nothing;
 
 insert into public.prestamo_detalles (prestamo_id, libro_id, cantidad_solicitada)

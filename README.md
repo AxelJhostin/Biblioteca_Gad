@@ -11,7 +11,7 @@ La base funcional incluye:
 - Catálogo público con búsqueda por título, autor, género y tipo de material.
 - Portada opcional, detalle de obra y disponibilidad física calculada.
 - Visor PDF integrado con zoom de 50 % a 200 %, vista de una o dos páginas, transición tipo hoja, teclado y gestos táctiles; sin enlace de descarga creado por la aplicación.
-- Registro, activación e inicio de sesión de clientes con cédula ecuatoriana.
+- Registro, activación e inicio de sesión de clientes con validación del dígito verificador de la cédula ecuatoriana.
 - Solicitud física autenticada de varios libros y cantidades, conservando la selección al ingresar.
 - Mi cuenta con historial propio, detalle, perfil y cambio de contraseña.
 - Prioridad transaccional por orden de llegada para el último ejemplar.
@@ -19,6 +19,8 @@ La base funcional incluye:
 - Aprobación separada de la entrega, con aviso interno al Cliente cuando el material queda listo para retirar.
 - Préstamo directo presencial, rechazo y devoluciones parciales o completas.
 - Vencimientos y bloqueo de clientes con material listo para retirar, activo o atrasado.
+- Plazo configurable de retiro, expiración automática y liberación de ejemplares no retirados.
+- Corrección auditada de revisiones e incidencias por daño, reparación, extravío o baja.
 - Gestión de catálogo, archivos digitales y cuentas del personal.
 - Restablecimiento de contraseña de bibliotecarios solo por administrador.
 - Activación y restablecimiento de cuentas de clientes por bibliotecario o administrador.
@@ -185,8 +187,9 @@ ADMIN_PASSWORD="una-contraseña-temporal-segura"
 LIBRARIAN_NAME=Bibliotecaria de Pruebas
 LIBRARIAN_USER=bibliotecaria
 LIBRARIAN_PASSWORD="Biblioteca#2026"
-CLIENT_DEMO_IDENTIFICATION=1301000001
+CLIENT_DEMO_IDENTIFICATION=1301000004
 CLIENT_DEMO_PASSWORD="Lector#Demo2026"
+PICKUP_EXPIRY_DAYS=5
 ```
 
 Luego ejecute:
@@ -199,7 +202,7 @@ El script es repetible y prepara el administrador, la cuenta bibliotecaria y, cu
 
 - Administrador: `admin` / `Admin#Cambiar2026`
 - Bibliotecaria: `bibliotecaria` / `Biblioteca#2026`
-- Cliente: `1301000001` / `Lector#Demo2026`
+- Cliente: `1301000004` / `Lector#Demo2026`
 
 Estas credenciales son únicamente para Docker local y deben reemplazarse u omitirse antes de publicar.
 
@@ -290,10 +293,21 @@ Bibliotecario y Administrador ven el mismo historial completo de solicitudes y p
 
 Si se aprueba al menos una línea, el registro queda `listo_retiro` y **Mi cuenta** notifica exclusivamente los materiales y cantidades aprobados. Si se rechazan todas, el registro queda `rechazado`. Las unidades rechazadas o no aprobadas se liberan de inmediato. Los préstamos directos permanecen atómicos: por tratarse de una entrega presencial inmediata, si falta stock de una de sus líneas no se crea un préstamo parcial.
 
+La aprobación permanece reservada durante `PICKUP_EXPIRY_DAYS` (5 días por defecto). Si no se registra la entrega, pasa a `expirado`, libera las unidades y genera un Movimiento automático. Antes de entregar, Personal puede corregir una revisión con motivo obligatorio; se vuelve a validar el stock y se reinicia el plazo.
+
+### Incidencias e inventario protegido
+
+- Un ejemplar devuelto dañado o enviado a reparación se recibe, pero queda fuera de circulación.
+- Un ejemplar extraviado continúa pendiente y mantiene el bloqueo hasta resolverse como recuperado o baja.
+- Resolver una incidencia reintegra el ejemplar o registra su baja sin falsear la disponibilidad.
+- No se puede desactivar un material comprometido ni reducir su total por debajo de lo prestado, apartado o fuera de circulación.
+- Bibliotecario y Administrador pueden inactivar/reactivar una cuenta Cliente con motivo; esto invalida sus sesiones y deja Movimiento.
+
 ### Disponibilidad
 
 ```text
 disponible = cantidad_total
+             - cantidades fuera de circulación por daño o reparación
              - cantidades de solicitudes pendientes
              - cantidades aprobadas listas para retiro
              - cantidades activas o atrasadas aún no devueltas
@@ -328,7 +342,9 @@ No existe un campo editable de cantidad disponible.
 - Una cuenta inactiva es rechazada en cada operación protegida, incluso si conserva un JWT anterior.
 - Las sesiones de Cliente y Personal usan tokens y claves de almacenamiento separados; el tipo de token se valida en la API.
 - Cinco intentos consecutivos de acceso de Cliente provocan un bloqueo temporal de 15 minutos.
+- El login de Personal limita a 10 los intentos por IP durante 15 minutos.
 - Cambiar o restablecer la contraseña de un Cliente incrementa su versión de sesión e invalida tokens anteriores.
+- Los PDF cargados deben declarar el MIME correcto y contener la firma binaria `%PDF-`; las portadas se decodifican y convierten a WebP.
 
 ## API principal
 
@@ -351,12 +367,16 @@ No existe un campo editable de cantidad disponible.
 | `GET` | `/api/clientes` | Bibliotecario/Administrador |
 | `POST` | `/api/clientes/:id/activar-cuenta` | Bibliotecario/Administrador |
 | `POST` | `/api/clientes/:id/restablecer-password` | Bibliotecario/Administrador |
+| `PATCH` | `/api/clientes/:id/estado-cuenta` | Bibliotecario/Administrador |
 | `POST` | `/api/auth/login` | Personal |
 | `GET` | `/api/prestamos` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/directo` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/:id/revisar` | Bibliotecario/Administrador |
+| `POST` | `/api/prestamos/:id/corregir-revision` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/:id/entregar` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/:id/devoluciones` | Bibliotecario/Administrador |
+| `POST` | `/api/prestamos/:id/incidencias` | Bibliotecario/Administrador |
+| `POST` | `/api/prestamos/incidencias/:id/resolver` | Bibliotecario/Administrador |
 | `POST/PATCH` | `/api/admin/libros[/:id]` | Administrador |
 | `POST` | `/api/admin/libros/:id/portada` | Administrador |
 | `POST` | `/api/admin/libros/:id/digital` | Administrador |

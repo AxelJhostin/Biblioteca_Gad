@@ -14,7 +14,7 @@ test('la selección se conserva al iniciar sesión y permite solicitar desde un 
 
   await expect(page.getByRole('heading', { name: 'Identifícate para continuar' })).toBeVisible();
   await page.locator('.request-login-callout').getByRole('link', { name: 'Ingresar' }).click();
-  await page.getByLabel('Cédula').fill('1301000001');
+  await page.getByLabel('Cédula').fill('1301000004');
   await page.getByLabel('Contraseña').fill('Lector#Demo2026');
   await page.getByRole('button', { name: 'Ingresar' }).click();
 

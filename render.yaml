@@ -20,6 +20,8 @@ services:
         value: "5"
       - key: JWT_TTL
         value: "3600"
+      - key: PICKUP_EXPIRY_DAYS
+        value: "5"
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL

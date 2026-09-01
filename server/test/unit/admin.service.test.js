@@ -55,3 +55,24 @@ test('permite editar libros que tienen campos opcionales vacíos en la base', as
   assert.equal(saved.descripcion, '');
   assert.equal(saved.anio_publicacion, null);
 });
+
+test('impide desactivar un libro que tiene préstamos o solicitudes abiertas', async () => {
+  const repository = {
+    transaction: async (callback) => callback({}),
+    lockBook: async () => ({ id: 7, cantidad_no_disponible: 0 }),
+    committedQuantity: async () => 1,
+  };
+  const service = createAdminService({ repository });
+  await assert.rejects(service.updateBook(7, {
+    id_libro_texto: 'BJM-007', tipo_material: 'libro', genero: 'narrativa', titulo: 'Cumandá',
+    cantidad_total: 2, autores: ['Juan León Mera'], activo: false,
+  }, { id: 1, rol: 'administrador', nombre_completo: 'Admin' }), (error) => error.code === 'BOOK_HAS_OPEN_LOANS');
+});
+
+test('rechaza un archivo disfrazado de PDF aunque declare el MIME correcto', async () => {
+  const repository = { lockBook: async () => ({ id: 7 }) };
+  const service = createAdminService({ repository, storage: {}, digitalBucket: 'digital' });
+  await assert.rejects(service.uploadDigital(7, {
+    mimetype: 'application/pdf', buffer: Buffer.from('contenido falso'), originalname: 'falso.pdf', size: 15,
+  }, { id: 1, rol: 'administrador', nombre_completo: 'Admin' }), /estructura PDF válida/);
+});

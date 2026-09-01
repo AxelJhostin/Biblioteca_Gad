@@ -1,5 +1,5 @@
 # Sistema de Gestión — Biblioteca Municipal
-## Documento de Análisis de Requerimientos (versión 2.1)
+## Documento de Análisis de Requerimientos (versión 2.2)
 
 ---
 
@@ -30,6 +30,7 @@
 | Descripción | Sinopsis o resumen del contenido. |
 | Año de publicación | Año en que fue publicada la obra. |
 | Cantidad total | Número total de ejemplares físicos que posee la biblioteca. |
+| Cantidad fuera de circulación | Ejemplares devueltos dañados o en reparación; no están disponibles, pero todavía pertenecen al inventario. |
 | Cantidad disponible | Ejemplares físicos libres en este momento (total − unidades aprobadas pendientes de devolución − unidades pendientes de revisión o listas para retiro). Se calcula, no se ingresa manualmente. |
 | ¿Disponible en digital? | Indica si existe una versión digital visualizable del libro. |
 | Archivo digital | Referencia al archivo (PDF u otro) mostrado en el visor embebido, si aplica. |
@@ -70,6 +71,7 @@ Credenciales separadas de la identidad bibliotecaria y de las cuentas del person
 | Estado | Activa o inactiva. |
 | Cambio obligatorio | Indica si debe sustituir una contraseña temporal. |
 | Seguridad de sesión | Intentos fallidos, bloqueo temporal, versión de sesión y último acceso. |
+| Inactivación operativa | Motivo, fecha y Personal que inactivó la cuenta; reactivarla no elimina el historial. |
 
 ### 2.5 Cuenta de personal (Bibliotecario / Administrador)
 
@@ -92,10 +94,11 @@ Reemplaza al bloque original "Información de libro prestado": aquellas pregunta
 | Bibliotecario | Funcionario que gestionó/aprobó el préstamo. |
 | Fecha de solicitud | Cuando el cliente pide el préstamo. |
 | Fecha de aprobación | Cuando el bibliotecario acepta la solicitud y el material queda listo para retiro. |
+| Fecha de expiración de retiro | Límite para retirar una aprobación; por defecto son cinco días calendario y es configurable. |
 | Fecha de entrega | Cuando el cliente retira físicamente el o los libros. |
 | Fecha límite de devolución | Definida por el bibliotecario según el caso, al registrar la entrega. |
 | Fecha real de devolución | Se registra al devolver; nula si sigue prestado. |
-| Estado | Pendiente / listo para retirar / rechazado / activo / devuelto / atrasado. |
+| Estado | Pendiente / listo para retirar / rechazado / expirado / activo / devuelto / atrasado. |
 
 ### 2.7 Detalle de Préstamo
 
@@ -127,6 +130,18 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 
 > Al decidir una línea de solicitud (aprobar, reducir o rechazar), registrar su entrega, registrar una devolución, ingresar un libro o editar un libro, el sistema genera obligatoriamente un Movimiento.
 
+### 2.9 Incidencia de préstamo
+
+Registra situaciones físicas sin borrar ni alterar silenciosamente el historial.
+
+| Campo | Descripción |
+|---|---|
+| Préstamo y material | Referencias al préstamo, línea y libro afectados. |
+| Tipo | Dañado, enviado a reparación o extraviado. |
+| Cantidad y comentario | Unidades afectadas y descripción obligatoria. |
+| Estado | Abierta o resuelta. |
+| Resolución | Reintegrado, recuperado o baja definitiva, con responsable y fecha. |
+
 ---
 
 ## 3. Funciones por rol
@@ -157,6 +172,9 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 9. Registrar un préstamo directamente cuando el cliente se presenta en la biblioteca, ingresando cédula, nombre, contacto, materiales, cantidades y fecha límite. La entrega queda activa en una sola operación.
 10. Exportar el inventario y los préstamos en PDF o Excel, respetando el filtro aplicado en cada módulo.
 11. Buscar clientes, activar sus cuentas y restablecer contraseñas temporales.
+12. Inactivar o reactivar cuentas Cliente con motivo registrado e invalidación inmediata de sesiones.
+13. Corregir una revisión antes de la entrega, con motivo obligatorio y nueva validación de stock.
+14. Registrar y resolver incidencias por daño, reparación o extravío.
 
 ### 3.3 Administrador (con autenticación)
 
@@ -180,6 +198,7 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 - Cambiar o restablecer una contraseña incrementa la versión de sesión e invalida tokens anteriores.
 - Una contraseña temporal debe cambiarse antes de solicitar materiales o consultar actividad.
 - Los clientes con historial previo se vinculan al registro existente mediante comprobación segura o asistencia del personal; no se duplican.
+- La cédula debe superar longitud, provincia, tipo de persona y dígito verificador ecuatoriano; no basta con escribir diez números.
 - No se puede aprobar una línea de préstamo por una cantidad superior a la solicitada ni a la disponibilidad que fue apartada para esa línea.
 - Un préstamo puede incluir más de un ejemplar de un mismo libro.
 - Un préstamo puede incluir cualquier cantidad de libros distintos a la vez; no existe límite funcional de títulos por solicitud. Los límites de tamaño de petición son solo una salvaguarda técnica.
@@ -190,6 +209,11 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 - Al crear solicitudes concurrentes por el último ejemplar disponible, la primera solicitud válida en orden de fecha y hora aparta la unidad. En una solicitud con varios materiales, las líneas posteriores sin disponibilidad se rechazan automáticamente sin afectar las demás; no se crea una reserva o lista de espera.
 - Rechazar una línea libera sus unidades, registra el Movimiento correspondiente y no genera notificaciones externas. Si todas las líneas se rechazan, el préstamo queda `rechazado`.
 - Si se aprueba al menos una línea, la solicitud queda `listo_retiro` y genera un aviso interno visible en **Mi cuenta** solamente para los materiales y cantidades aprobados. El aviso desaparece cuando el personal registra la entrega.
+- Una aprobación expira después del plazo configurable (cinco días por defecto). Si no se retira, pasa a `expirado`, libera el stock y registra un Movimiento automático.
+- La revisión puede corregirse únicamente antes de la entrega. Exige motivo, decide todas las líneas, verifica de nuevo la disponibilidad y deja Movimientos de corrección.
+- Un material devuelto dañado o en reparación cuenta como recibido, pero aumenta la cantidad fuera de circulación. Un extravío continúa pendiente hasta recuperarse o darse de baja.
+- Una cuenta Cliente inactivada no puede iniciar sesión ni conservar sesiones anteriores. La reactivación conserva todo el historial y ambas acciones quedan auditadas.
+- El Administrador no puede desactivar un libro comprometido ni reducir la cantidad total por debajo de la suma de unidades comprometidas y fuera de circulación.
 - No se incluyen notificaciones externas por correo, WhatsApp, SMS ni servicios de terceros.
 - No se requiere un mecanismo de respaldo adicional dentro de la aplicación: la base de datos en la nube gestiona sus propios respaldos.
 - El visor digital debe funcionar con teclado y controles táctiles. En pantallas móviles se prioriza una página por vez; las transiciones se reducen si el dispositivo solicita menos movimiento.

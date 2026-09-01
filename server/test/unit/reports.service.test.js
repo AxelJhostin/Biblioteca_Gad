@@ -13,7 +13,7 @@ function repository() {
       cantidad_total: 4, cantidad_disponible: 3, cantidad_comprometida: 1, digital_disponible: false,
     }],
     prestamos: async () => [{
-      codigo: 'SOL-001', estado: 'activo', nombre_completo: 'Ana Mendoza', identificacion: '1301000001',
+      codigo: 'SOL-001', estado: 'activo', nombre_completo: 'Ana Mendoza', identificacion: '1301000004',
       materiales: 'BJM-001 - Los Sangurimas (1)', fecha_solicitud: generatedAt, fecha_limite: '2026-09-14',
       unidades_pendientes: 1, bibliotecario_nombre: 'Bibliotecaria de Pruebas',
     }],

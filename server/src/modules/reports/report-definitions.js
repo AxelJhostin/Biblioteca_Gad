@@ -47,6 +47,7 @@ const definitions = {
       { key: 'total', label: 'Total', width: 42, align: 'right' },
       { key: 'disponibles', label: 'Disp.', width: 42, align: 'right' },
       { key: 'comprometidos', label: 'Prest.', width: 42, align: 'right' },
+      { key: 'fuera', label: 'Fuera circ.', width: 48, align: 'right' },
       { key: 'digital', label: 'Digital', width: 48, align: 'center' },
     ],
     map: (item) => ({
@@ -59,6 +60,7 @@ const definitions = {
       total: Number(item.cantidad_total),
       disponibles: Number(item.cantidad_disponible),
       comprometidos: Number(item.cantidad_comprometida),
+      fuera: Number(item.cantidad_no_disponible),
       digital: item.digital_disponible ? 'Sí' : 'No',
     }),
   },

@@ -67,8 +67,12 @@ export function createAdminService({ repository, storage, coversBucket, digitalB
         const current = await repository.lockBook(tx, id);
         if (!current) throw new NotFoundError('Libro no encontrado.');
         const committed = await repository.committedQuantity(tx, id);
-        if (input.cantidad_total < committed) {
-          throw new ConflictError(`La cantidad total no puede ser menor a ${committed}, que ya están prestados o apartados.`, 'QUANTITY_BELOW_COMMITTED');
+        const unavailable = Number(current.cantidad_no_disponible || 0);
+        if (input.cantidad_total < committed + unavailable) {
+          throw new ConflictError(`La cantidad total no puede ser menor a ${committed + unavailable}: ${committed} están comprometidos y ${unavailable} fuera de circulación.`, 'QUANTITY_BELOW_COMMITTED');
+        }
+        if (!input.activo && committed > 0) {
+          throw new ConflictError('No puede desactivar un material con solicitudes o préstamos abiertos.', 'BOOK_HAS_OPEN_LOANS');
         }
         const book = await repository.updateBook(tx, id, input);
         await repository.syncAuthors(tx, id, input.autores);
@@ -109,6 +113,9 @@ export function createAdminService({ repository, storage, coversBucket, digitalB
     },
     async uploadDigital(id, file, staff) {
       if (!file || file.mimetype !== 'application/pdf') throw new ValidationError('Seleccione un archivo PDF.');
+      if (file.buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
+        throw new ValidationError('El archivo no contiene una estructura PDF válida.');
+      }
       const current = await repository.lockBook(null, id);
       if (!current) throw new NotFoundError('Libro no encontrado.');
       const storagePath = await storage.upload({

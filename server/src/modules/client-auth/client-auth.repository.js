@@ -4,6 +4,7 @@ export function createClientAuthRepository(db) {
   const accountSelect = `
     select ca.id, ca.cliente_id, ca.password_hash, ca.estado, ca.debe_cambiar_password,
            ca.intentos_fallidos, ca.bloqueado_hasta, ca.version_sesion, ca.ultimo_acceso,
+           ca.motivo_inactivacion, ca.inactivada_en,
            c.identificacion, c.nombre_completo, c.telefono, c.correo
       from public.cuentas_clientes ca
       join public.clientes c on c.id = ca.cliente_id`;
@@ -119,7 +120,7 @@ export function createClientAuthRepository(db) {
     async listLoans(clientId) {
       const { rows } = await db.query(
         `select p.id, p.codigo, p.estado, p.fecha_solicitud, p.fecha_aprobacion,
-                p.fecha_entrega, p.fecha_limite, p.fecha_devolucion,
+                p.fecha_entrega, p.fecha_limite, p.fecha_devolucion, p.fecha_expiracion_retiro,
                 coalesce(json_agg(json_build_object(
                   'id', d.id, 'libro_id', l.id, 'titulo', l.titulo,
                   'id_libro_texto', l.id_libro_texto,
@@ -127,6 +128,11 @@ export function createClientAuthRepository(db) {
                   'cantidad_aprobada', d.cantidad_aprobada,
                   'cantidad_devuelta', d.cantidad_devuelta,
                   'motivo_rechazo', d.motivo_rechazo,
+                  'incidencias', coalesce((select json_agg(json_build_object(
+                    'id', i.id, 'tipo', i.tipo, 'cantidad', i.cantidad, 'comentario', i.comentario,
+                    'estado', i.estado, 'resolucion', i.resolucion
+                  ) order by i.registrada_en desc) from public.incidencias_prestamo i
+                    where i.prestamo_detalle_id = d.id), '[]'::json),
                   'estado_revision', case when d.cantidad_aprobada is null then 'pendiente'
                     when d.cantidad_aprobada = 0 then 'rechazado' else 'aprobado' end
                 ) order by d.id) filter (where d.id is not null), '[]') as detalles
@@ -144,7 +150,7 @@ export function createClientAuthRepository(db) {
     async findLoan(clientId, loanId) {
       const { rows } = await db.query(
         `select p.id, p.codigo, p.estado, p.fecha_solicitud, p.fecha_aprobacion,
-                p.fecha_entrega, p.fecha_limite, p.fecha_devolucion,
+                p.fecha_entrega, p.fecha_limite, p.fecha_devolucion, p.fecha_expiracion_retiro,
                 coalesce(json_agg(json_build_object(
                   'id', d.id, 'libro_id', l.id, 'titulo', l.titulo,
                   'id_libro_texto', l.id_libro_texto, 'tipo_material', l.tipo_material,
@@ -152,6 +158,11 @@ export function createClientAuthRepository(db) {
                   'cantidad_aprobada', d.cantidad_aprobada,
                   'cantidad_devuelta', d.cantidad_devuelta,
                   'motivo_rechazo', d.motivo_rechazo,
+                  'incidencias', coalesce((select json_agg(json_build_object(
+                    'id', i.id, 'tipo', i.tipo, 'cantidad', i.cantidad, 'comentario', i.comentario,
+                    'estado', i.estado, 'resolucion', i.resolucion
+                  ) order by i.registrada_en desc) from public.incidencias_prestamo i
+                    where i.prestamo_detalle_id = d.id), '[]'::json),
                   'estado_revision', case when d.cantidad_aprobada is null then 'pendiente'
                     when d.cantidad_aprobada = 0 then 'rechazado' else 'aprobado' end
                 ) order by d.id) filter (where d.id is not null), '[]') as detalles
@@ -181,7 +192,7 @@ export function createClientAuthRepository(db) {
         `select c.id, c.identificacion, c.nombre_completo, c.telefono, c.correo,
                 ca.id as cuenta_id, coalesce(ca.estado, false) as cuenta_activa,
                 coalesce(ca.debe_cambiar_password, false) as debe_cambiar_password,
-                ca.ultimo_acceso
+                ca.ultimo_acceso, ca.motivo_inactivacion, ca.inactivada_en
            from public.clientes c
            left join public.cuentas_clientes ca on ca.cliente_id = c.id
           where $1 = '%%' or c.identificacion ilike $1 or c.nombre_completo ilike $1
@@ -209,10 +220,27 @@ export function createClientAuthRepository(db) {
         `update public.cuentas_clientes
             set password_hash = $2, debe_cambiar_password = true,
                 version_sesion = version_sesion + 1,
-                intentos_fallidos = 0, bloqueado_hasta = null, estado = true
+                intentos_fallidos = 0, bloqueado_hasta = null
           where id = $1
           returning id, cliente_id, estado, debe_cambiar_password, version_sesion`,
         [accountId, passwordHash],
+      );
+      return rows[0] || null;
+    },
+
+    async setClientAccountStatus(tx, accountId, input, staffId) {
+      const { rows } = await executor(tx).query(
+        `update public.cuentas_clientes
+            set estado = $2,
+                motivo_inactivacion = case when $2 then null else $3 end,
+                inactivada_en = case when $2 then null else now() end,
+                inactivada_por = case when $2 then null else $4 end,
+                version_sesion = version_sesion + 1,
+                intentos_fallidos = 0,
+                bloqueado_hasta = null
+          where id = $1
+          returning id, cliente_id, estado, motivo_inactivacion, inactivada_en, version_sesion`,
+        [accountId, input.estado, input.motivo || null, staffId],
       );
       return rows[0] || null;
     },

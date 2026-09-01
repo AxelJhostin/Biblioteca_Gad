@@ -4,7 +4,7 @@ import { normalizeRequestClient, numericInput, personNameInput, serverFieldError
 describe('validación de solicitudes', () => {
   it('explica que teléfono o correo es obligatorio', () => {
     const result = validateLoanRequest({
-      identificacion: '1300000001', nombre_completo: 'Cliente de prueba', telefono: '', correo: '',
+      identificacion: '1300000005', nombre_completo: 'Cliente de prueba', telefono: '', correo: '',
     }, [{ id: 1 }]);
 
     expect(result.errors.telefono).toContain('teléfono o un correo');
@@ -12,11 +12,11 @@ describe('validación de solicitudes', () => {
 
   it('normaliza los datos y acepta un teléfono válido', () => {
     const result = validateLoanRequest({
-      identificacion: ' 1300000001 ', nombre_completo: ' Ana   Lectora ', telefono: '0991234567', correo: '',
+      identificacion: ' 1300000005 ', nombre_completo: ' Ana   Lectora ', telefono: '0991234567', correo: '',
     }, [{ id: 1 }]);
 
     expect(result.errors).toEqual({});
-    expect(result.value).toEqual({ identificacion: '1300000001', nombre_completo: 'Ana Lectora', telefono: '0991234567', correo: '' });
+    expect(result.value).toEqual({ identificacion: '1300000005', nombre_completo: 'Ana Lectora', telefono: '0991234567', correo: '' });
   });
 
   it('convierte los errores de la API en mensajes por campo', () => {
@@ -24,8 +24,8 @@ describe('validación de solicitudes', () => {
   });
 
   it('normaliza correo e identificación antes de enviar', () => {
-    expect(normalizeRequestClient({ identificacion: ' 1300000001 ', nombre_completo: ' Ana ', telefono: '', correo: ' A@B.COM ' }))
-      .toMatchObject({ identificacion: '1300000001', nombre_completo: 'Ana', correo: 'a@b.com' });
+    expect(normalizeRequestClient({ identificacion: ' 1300000005 ', nombre_completo: ' Ana ', telefono: '', correo: ' A@B.COM ' }))
+      .toMatchObject({ identificacion: '1300000005', nombre_completo: 'Ana', correo: 'a@b.com' });
   });
 
   it('elimina letras de cédula y teléfono al escribir o pegar', () => {
@@ -37,8 +37,15 @@ describe('validación de solicitudes', () => {
     expect(personNameInput("María2 José O'Connor-Álava3")).toBe("María José O'Connor-Álava");
   });
 
+  it('rechaza una cédula con diez dígitos pero dígito verificador incorrecto', () => {
+    const result = validateLoanRequest({
+      identificacion: '1301000001', nombre_completo: 'Ana Lectora', telefono: '0991234567', correo: '',
+    }, [{ id: 1 }]);
+    expect(result.errors.identificacion).toContain('ecuatoriana válida');
+  });
+
   it('acepta celular y fijo ecuatorianos y rechaza otros formatos', () => {
-    const base = { identificacion: '1300000001', nombre_completo: 'Ana Lectora', correo: '' };
+    const base = { identificacion: '1300000005', nombre_completo: 'Ana Lectora', correo: '' };
     expect(validateLoanRequest({ ...base, telefono: '0991234567' }, [{ id: 1 }]).errors.telefono).toBeUndefined();
     expect(validateLoanRequest({ ...base, telefono: '052123456' }, [{ id: 1 }]).errors.telefono).toBeUndefined();
     expect(validateLoanRequest({ ...base, telefono: '0812345678' }, [{ id: 1 }]).errors.telefono).toContain('ecuatoriano');

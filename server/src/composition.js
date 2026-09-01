@@ -44,7 +44,7 @@ export function createDependencies(overrides = {}) {
     authenticateClient: overrides.authenticateClient || createClientAuthMiddleware(clientAuthService),
     storage,
     catalogRepository: overrides.catalogRepository || createCatalogRepository(db),
-    loansService: overrides.loansService || createLoansService(loansRepository),
+    loansService: overrides.loansService || createLoansService(loansRepository, { pickupExpiryDays: env.PICKUP_EXPIRY_DAYS }),
     adminService: overrides.adminService || createAdminService({
       repository: adminRepository,
       storage,
