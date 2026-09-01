@@ -56,6 +56,14 @@ test('permite editar libros que tienen campos opcionales vacíos en la base', as
   assert.equal(saved.anio_publicacion, null);
 });
 
+test('explica en español cuando un autor no alcanza el mínimo de caracteres', async () => {
+  const service = createAdminService({ repository: {} });
+  await assert.rejects(service.createBook({
+    id_libro_texto: 'BJM-008', tipo_material: 'libro', genero: 'narrativa', titulo: 'Ensayo de prueba',
+    cantidad_total: 1, autores: ['X'], activo: true,
+  }, { id: 1, rol: 'administrador', nombre_completo: 'Admin' }), /Cada autor debe tener al menos 2 caracteres/);
+});
+
 test('impide desactivar un libro que tiene préstamos o solicitudes abiertas', async () => {
   const repository = {
     transaction: async (callback) => callback({}),

@@ -14,7 +14,9 @@ const bookSchema = z.object({
   descripcion: z.string().max(5000).nullish().transform((value) => value ?? ''),
   anio_publicacion: z.union([z.literal(''), z.null(), z.coerce.number().int().min(1000).max(2200)]).optional(),
   cantidad_total: z.coerce.number().int().min(0),
-  autores: z.array(z.string().min(2).max(180)).min(1).max(20),
+  autores: z.array(z.string().transform(cleanText).pipe(z.string()
+    .min(2, 'Cada autor debe tener al menos 2 caracteres.')
+    .max(180, 'Cada autor puede tener hasta 180 caracteres.'))).min(1, 'Ingresa al menos un autor.').max(20),
   activo: z.boolean().optional().default(true),
 }).superRefine((value, ctx) => {
   if (value.tipo_material === 'otro' && !cleanText(value.tipo_material_otro)) {
