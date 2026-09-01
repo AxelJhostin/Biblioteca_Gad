@@ -48,7 +48,7 @@ export function createReportsRepository(db) {
              select coalesce(sum(d.cantidad_solicitada - d.cantidad_devuelta), 0)::integer as comprometida
              from public.prestamo_detalles d
              join public.prestamos p on p.id = d.prestamo_id
-             where d.libro_id = l.id and p.estado in ('pendiente', 'activo', 'atrasado')
+             where d.libro_id = l.id and p.estado in ('pendiente', 'listo_retiro', 'activo', 'atrasado')
            ) stock on true
           where ${where.join(' and ')}
           order by l.titulo asc

@@ -34,9 +34,13 @@ export function createStaffLoanRoutes({ service, authenticate }) {
     const item = await service.createDirectLoan(req.body, req.user);
     res.status(201).json({ ok: true, message: 'Préstamo directo registrado y entregado.', item });
   }));
-  router.post('/:id/aprobar-entregar', asyncHandler(async (req, res) => {
-    const item = await service.approveAndDeliver(req.params.id, req.body.fecha_limite, req.user);
-    res.json({ ok: true, message: 'Préstamo aprobado y entregado.', item });
+  router.post('/:id/aprobar', asyncHandler(async (req, res) => {
+    const item = await service.approve(req.params.id, req.user);
+    res.json({ ok: true, message: 'Solicitud aprobada y lista para retiro.', item });
+  }));
+  router.post('/:id/entregar', asyncHandler(async (req, res) => {
+    const item = await service.deliver(req.params.id, req.body.fecha_limite, req.user);
+    res.json({ ok: true, message: 'Entrega registrada.', item });
   }));
   router.post('/:id/rechazar', asyncHandler(async (req, res) => {
     const item = await service.reject(req.params.id, req.body.motivo, req.user);

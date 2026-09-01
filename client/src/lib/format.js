@@ -7,6 +7,9 @@ export const formatDateTime = (value) => value
   : '—';
 
 export const stateClass = (state) => ({
-  pendiente: 'warning', activo: 'success', atrasado: 'danger', devuelto: 'secondary', rechazado: 'dark',
+  pendiente: 'warning', listo_retiro: 'primary', activo: 'success', atrasado: 'danger', devuelto: 'secondary', rechazado: 'dark',
 }[state] || 'secondary');
 
+export const stateLabel = (state) => ({
+  pendiente: 'Pendiente', listo_retiro: 'Listo para retirar', activo: 'Activo', atrasado: 'Atrasado', devuelto: 'Devuelto', rechazado: 'Rechazado',
+}[state] || state);

@@ -24,7 +24,7 @@ export function createAdminRepository(db) {
         `select coalesce(sum(d.cantidad_solicitada - d.cantidad_devuelta), 0)::integer as total
            from public.prestamo_detalles d
            join public.prestamos p on p.id = d.prestamo_id
-          where d.libro_id = $1 and p.estado in ('pendiente','activo','atrasado')`,
+          where d.libro_id = $1 and p.estado in ('pendiente','listo_retiro','activo','atrasado')`,
         [bookId],
       );
       return Number(rows[0].total);
@@ -115,4 +115,3 @@ export function createAdminRepository(db) {
     },
   };
 }
-

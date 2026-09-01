@@ -27,7 +27,7 @@ export function createLoansRepository(db) {
       const { rows } = await executor(tx).query(
         `select exists(
            select 1 from public.prestamos
-            where cliente_id = $1 and estado in ('activo', 'atrasado')
+            where cliente_id = $1 and estado in ('listo_retiro', 'activo', 'atrasado')
               and ($2::bigint is null or id <> $2)
          ) as blocked`,
         [clientId, exceptLoanId],
@@ -51,7 +51,7 @@ export function createLoansRepository(db) {
                 coalesce(sum(d.cantidad_solicitada - d.cantidad_devuelta), 0)::integer as cantidad_comprometida
            from public.prestamo_detalles d
            join public.prestamos p on p.id = d.prestamo_id
-          where d.libro_id = any($1::bigint[]) and p.estado in ('pendiente', 'activo', 'atrasado')
+          where d.libro_id = any($1::bigint[]) and p.estado in ('pendiente', 'listo_retiro', 'activo', 'atrasado')
           group by d.libro_id`,
         [ids],
       );
@@ -130,7 +130,7 @@ export function createLoansRepository(db) {
            left join public.libros l on l.id = d.libro_id
           where ${where.join(' and ')}
           group by p.id, c.id, cp.id
-          order by case p.estado when 'pendiente' then 0 when 'atrasado' then 1 when 'activo' then 2 else 3 end,
+          order by case p.estado when 'pendiente' then 0 when 'listo_retiro' then 1 when 'atrasado' then 2 when 'activo' then 3 else 4 end,
                    p.fecha_solicitud asc`,
         params,
       );
@@ -164,10 +164,18 @@ export function createLoansRepository(db) {
       );
       return rows;
     },
-    activate(tx, loanId, staffId, dueDate) {
+    approveForPickup(tx, loanId, staffId) {
       return executor(tx).query(
         `update public.prestamos
-            set estado = 'activo', bibliotecario_id = $2, fecha_aprobacion = now(),
+            set estado = 'listo_retiro', bibliotecario_id = $2, fecha_aprobacion = now()
+          where id = $1`,
+        [loanId, staffId],
+      );
+    },
+    deliver(tx, loanId, staffId, dueDate) {
+      return executor(tx).query(
+        `update public.prestamos
+            set estado = 'activo', bibliotecario_id = $2,
                 fecha_entrega = now(), fecha_limite = $3
           where id = $1`,
         [loanId, staffId, dueDate],

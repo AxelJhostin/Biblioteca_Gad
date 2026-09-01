@@ -5,9 +5,10 @@ import { createLoansService } from '../../src/modules/loans/loans.service.js';
 function fakeRepository(options = {}) {
   const movements = [];
   const lockedIds = [];
+  const transitions = [];
   let created;
   return {
-    movements, lockedIds,
+    movements, lockedIds, transitions,
     transaction: (callback) => callback({}),
     findClientById: async () => ({ id: 8, identificacion: '1300000000', nombre_completo: 'Ana Lectora' }),
     upsertClient: async () => ({ id: 8, identificacion: '1300000000', nombre_completo: 'Ana Lectora' }),
@@ -21,6 +22,10 @@ function fakeRepository(options = {}) {
     createDirectLoan: async (_tx, input) => (created = { id: 11, codigo: 'SOL-DIRECTO', estado: 'activo', ...input }),
     addDetails: async () => {},
     addMovement: async (_tx, movement) => movements.push(movement),
+    lockLoan: async () => options.missingLoan ? null : ({ id: 10, cliente_id: 8, estado: options.loanState || 'pendiente' }),
+    getDetails: async () => [{ id: 30, libro_id: 1, titulo: 'Libro 1', cantidad_solicitada: 1, cantidad_devuelta: 0 }],
+    approveForPickup: async (_tx, loanId, staffId) => transitions.push({ action: 'approve', loanId, staffId }),
+    deliver: async (_tx, loanId, staffId, dueDate) => transitions.push({ action: 'deliver', loanId, staffId, dueDate }),
     get created() { return created; },
   };
 }
@@ -124,5 +129,41 @@ test('el préstamo directo no se registra cuando falta disponibilidad', async ()
       { id: 4, rol: 'bibliotecario', nombre_completo: 'María Bibliotecaria' },
     ),
     (error) => error.code === 'OUT_OF_STOCK' && error.status === 409,
+  );
+});
+
+test('aprobar una solicitud la deja lista para retiro y genera su movimiento', async () => {
+  const repository = fakeRepository();
+  const result = await createLoansService(repository).approve(
+    10,
+    { id: 4, rol: 'bibliotecario', nombre_completo: 'María Bibliotecaria' },
+  );
+  assert.equal(result.estado, 'listo_retiro');
+  assert.deepEqual(repository.transitions[0], { action: 'approve', loanId: 10, staffId: 4 });
+  assert.match(repository.movements[0].detalle, /lista para retiro/);
+});
+
+test('registrar el retiro activa el préstamo y define la fecha límite', async () => {
+  const repository = fakeRepository({ loanState: 'listo_retiro' });
+  const result = await createLoansService(repository).deliver(
+    10,
+    '2099-12-31',
+    { id: 4, rol: 'bibliotecario', nombre_completo: 'María Bibliotecaria' },
+  );
+  assert.equal(result.estado, 'activo');
+  assert.equal(result.fecha_limite, '2099-12-31');
+  assert.deepEqual(repository.transitions[0], { action: 'deliver', loanId: 10, staffId: 4, dueDate: '2099-12-31' });
+  assert.match(repository.movements[0].detalle, /Material entregado/);
+});
+
+test('no permite registrar entrega antes de aprobar la solicitud', async () => {
+  const repository = fakeRepository({ loanState: 'pendiente' });
+  await assert.rejects(
+    createLoansService(repository).deliver(
+      10,
+      '2099-12-31',
+      { id: 4, rol: 'bibliotecario', nombre_completo: 'María Bibliotecaria' },
+    ),
+    (error) => error.code === 'INVALID_LOAN_STATE' && error.status === 409,
   );
 });

@@ -4,7 +4,7 @@ export function createCatalogRepository(db) {
       select sum(d.cantidad_solicitada - d.cantidad_devuelta)::integer
       from public.prestamo_detalles d
       join public.prestamos p on p.id = d.prestamo_id
-      where d.libro_id = l.id and p.estado in ('pendiente', 'activo', 'atrasado')
+      where d.libro_id = l.id and p.estado in ('pendiente', 'listo_retiro', 'activo', 'atrasado')
     ), 0))`;
 
   return {
@@ -88,4 +88,3 @@ export function createCatalogRepository(db) {
     },
   };
 }
-

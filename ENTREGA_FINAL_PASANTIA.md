@@ -46,7 +46,8 @@ Al momento de esta entrega:
 
 - Inicio de sesión protegido.
 - Consulta detallada de solicitudes y materiales solicitados.
-- Aprobación, entrega o rechazo de solicitudes.
+- Aprobación de solicitudes para retiro, separada de la entrega física.
+- Registro de entrega y fecha límite cuando el cliente retira el material.
 - Registro de préstamos presenciales directos.
 - Registro de devoluciones parciales y completas.
 - Consulta detallada del catálogo, portadas y disponibilidad.
@@ -67,8 +68,10 @@ Al momento de esta entrega:
 - Las solicitudes concurrentes se atienden por fecha y hora de llegada.
 - El último ejemplar disponible se asigna de forma transaccional a la primera solicitud que cumpla las condiciones.
 - Un rechazo cambia el estado del préstamo y genera el movimiento correspondiente; no envía notificaciones.
+- Una aprobación cambia a `listo_retiro` y muestra exclusivamente un aviso interno en **Mi cuenta**; no envía correo, WhatsApp ni SMS.
+- Los ejemplares permanecen apartados mientras están pendientes, listos para retiro, activos o atrasados.
 - Cada aprobación, rechazo, devolución, ingreso o edición relevante deja trazabilidad en `Movimiento`.
-- Un cliente con material activo o atrasado queda sujeto a las restricciones definidas en los requerimientos.
+- Un cliente con material listo para retirar, activo o atrasado queda sujeto a las restricciones definidas en los requerimientos.
 - El identificador físico del libro se conserva como texto libre hasta que la biblioteca confirme su formato definitivo.
 
 ## 3. Arquitectura técnica

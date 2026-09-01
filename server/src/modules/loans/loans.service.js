@@ -64,7 +64,7 @@ export function createLoansService(repository) {
         const client = await repository.findClientById(tx, authenticatedClient?.cliente_id);
         if (!client) throw new NotFoundError('Cliente no encontrado.');
         if (await repository.hasOpenLoan(tx, client.id)) {
-          throw new ConflictError('El cliente tiene un préstamo activo o atrasado pendiente de devolución.', 'CLIENT_BLOCKED');
+          throw new ConflictError('El cliente tiene un préstamo listo para retiro, activo o atrasado.', 'CLIENT_BLOCKED');
         }
 
         const ids = input.items.map((item) => item.libro_id);
@@ -102,7 +102,7 @@ export function createLoansService(repository) {
       return repository.transaction(async (tx) => {
         const client = await repository.upsertClient(tx, input.cliente);
         if (await repository.hasOpenLoan(tx, client.id)) {
-          throw new ConflictError('El cliente tiene un préstamo activo o atrasado pendiente de devolución.', 'CLIENT_BLOCKED');
+          throw new ConflictError('El cliente tiene un préstamo listo para retiro, activo o atrasado.', 'CLIENT_BLOCKED');
         }
 
         const ids = input.items.map((item) => item.libro_id);
@@ -141,26 +141,45 @@ export function createLoansService(repository) {
       if (!loan) throw new NotFoundError('No se encontró una solicitud con esos datos.');
       return loan;
     },
-    async approveAndDeliver(id, dueDate, staff) {
-      validateDueDate(dueDate);
-
+    async approve(id, staff) {
       return repository.transaction(async (tx) => {
         const loan = await repository.lockLoan(tx, id);
         if (!loan) throw new NotFoundError('Solicitud no encontrada.');
         if (loan.estado !== 'pendiente') throw new ConflictError('La solicitud ya fue procesada.', 'LOAN_ALREADY_PROCESSED');
         if (await repository.hasOpenLoan(tx, loan.cliente_id, loan.id)) {
-          throw new ConflictError('El cliente ya tiene otro préstamo activo o atrasado.', 'CLIENT_BLOCKED');
+          throw new ConflictError('El cliente ya tiene otro préstamo listo para retiro, activo o atrasado.', 'CLIENT_BLOCKED');
         }
         const details = await repository.getDetails(tx, loan.id);
-        await repository.lockBooks(tx, details.map((detail) => Number(detail.libro_id)));
-        await repository.activate(tx, loan.id, staff.id, dueDate);
+        await repository.approveForPickup(tx, loan.id, staff.id);
         await repository.addMovement(tx, {
           tipo: 'prestamo', tipo_actor: staff.rol, cuenta_personal_id: staff.id,
           actor_nombre: staff.nombre_completo, prestamo_id: loan.id,
           libro_id: details.length === 1 ? details[0].libro_id : null,
-          detalle: `Préstamo aprobado y entregado. Fecha límite: ${dueDate}.`,
+          detalle: 'Solicitud aprobada y lista para retiro.',
         });
-        return { ...loan, estado: 'activo', fecha_limite: dueDate };
+        return { ...loan, estado: 'listo_retiro', bibliotecario_id: staff.id };
+      });
+    },
+    async deliver(id, dueDate, staff) {
+      validateDueDate(dueDate);
+
+      return repository.transaction(async (tx) => {
+        const loan = await repository.lockLoan(tx, id);
+        if (!loan) throw new NotFoundError('Préstamo no encontrado.');
+        if (loan.estado !== 'listo_retiro') throw new ConflictError('El préstamo no está listo para retiro.', 'INVALID_LOAN_STATE');
+        if (await repository.hasOpenLoan(tx, loan.cliente_id, loan.id)) {
+          throw new ConflictError('El cliente ya tiene otro préstamo listo para retiro, activo o atrasado.', 'CLIENT_BLOCKED');
+        }
+        const details = await repository.getDetails(tx, loan.id);
+        await repository.lockBooks(tx, details.map((detail) => Number(detail.libro_id)));
+        await repository.deliver(tx, loan.id, staff.id, dueDate);
+        await repository.addMovement(tx, {
+          tipo: 'prestamo', tipo_actor: staff.rol, cuenta_personal_id: staff.id,
+          actor_nombre: staff.nombre_completo, prestamo_id: loan.id,
+          libro_id: details.length === 1 ? details[0].libro_id : null,
+          detalle: `Material entregado. Fecha límite: ${dueDate}.`,
+        });
+        return { ...loan, estado: 'activo', fecha_limite: dueDate, bibliotecario_id: staff.id };
       });
     },
     async reject(id, reason, staff) {

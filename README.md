@@ -16,8 +16,9 @@ La base funcional incluye:
 - Mi cuenta con historial propio, detalle, perfil y cambio de contraseña.
 - Prioridad transaccional por orden de llegada para el último ejemplar.
 - Login para bibliotecarios y administradores.
-- Aprobación/entrega, préstamo directo presencial, rechazo y devoluciones parciales o completas.
-- Vencimientos y bloqueo de clientes con material activo o atrasado.
+- Aprobación separada de la entrega, con aviso interno al Cliente cuando el material queda listo para retirar.
+- Préstamo directo presencial, rechazo y devoluciones parciales o completas.
+- Vencimientos y bloqueo de clientes con material listo para retirar, activo o atrasado.
 - Gestión de catálogo, archivos digitales y cuentas del personal.
 - Restablecimiento de contraseña de bibliotecarios solo por administrador.
 - Activación y restablecimiento de cuentas de clientes por bibliotecario o administrador.
@@ -229,7 +230,7 @@ La suite cubre actualmente:
 
 - Autenticación correcta e intento inválido.
 - Validación de contacto del cliente.
-- Bloqueo por préstamo activo/atrasado.
+- Bloqueo por préstamo listo para retirar, activo o atrasado.
 - Priorización del último ejemplar y orden estable de bloqueos.
 - Rechazo automático cuando el stock ya fue comprometido.
 - Endpoints públicos por HTTP.
@@ -261,13 +262,14 @@ Para cambios de base de datos también se debe validar la migración sobre una b
 
 ### Concurrencia del último ejemplar
 
-La creación de solicitudes se ejecuta dentro de una transacción. Los libros se bloquean con `FOR UPDATE` en orden ascendente de ID; después se calcula el material ya comprometido por solicitudes pendientes, préstamos activos y atrasados. Esto garantiza que la primera transacción válida aparte la unidad y que las posteriores se registren como rechazadas sin disponibilidad negativa.
+La creación de solicitudes se ejecuta dentro de una transacción. Los libros se bloquean con `FOR UPDATE` en orden ascendente de ID; después se calcula el material ya comprometido por solicitudes pendientes, listas para retiro, préstamos activos y atrasados. Esto garantiza que la primera transacción válida aparte la unidad y que las posteriores se registren como rechazadas sin disponibilidad negativa.
 
 ### Disponibilidad
 
 ```text
 disponible = cantidad_total
              - cantidades de solicitudes pendientes
+             - cantidades aprobadas listas para retiro
              - cantidades activas o atrasadas aún no devueltas
 ```
 
@@ -326,7 +328,8 @@ No existe un campo editable de cantidad disponible.
 | `POST` | `/api/auth/login` | Personal |
 | `GET` | `/api/prestamos` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/directo` | Bibliotecario/Administrador |
-| `POST` | `/api/prestamos/:id/aprobar-entregar` | Bibliotecario/Administrador |
+| `POST` | `/api/prestamos/:id/aprobar` | Bibliotecario/Administrador |
+| `POST` | `/api/prestamos/:id/entregar` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/:id/rechazar` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/:id/devoluciones` | Bibliotecario/Administrador |
 | `POST/PATCH` | `/api/admin/libros[/:id]` | Administrador |
@@ -375,7 +378,7 @@ Los módulos se comunican mediante repositorios y servicios, no importando SQL d
 
 - Sustituir almacenamiento local por Supabase Storage sin modificar controladores.
 - Probar reglas con repositorios falsos y API mediante dependencias inyectadas.
-- Añadir notificaciones, reservas o analítica avanzada como módulos independientes.
+- Añadir canales externos de notificación, reservas o analítica avanzada como módulos independientes. El aviso interno de retiro se deriva del estado del préstamo y no necesita un servicio externo.
 - Separar procesos programados cuando el volumen lo requiera.
 - Escalar horizontalmente la API porque el estado operativo reside en PostgreSQL/Storage.
 

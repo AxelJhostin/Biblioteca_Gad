@@ -45,7 +45,7 @@ function dependencies() {
     loansService: {
       createClientRequest: async () => ({ rejected: false, loan: { codigo: 'SOL-UNO', estado: 'pendiente' } }),
       getClientStatus: async () => ({ codigo: 'SOL-UNO', estado: 'pendiente' }),
-      list: async () => [], approveAndDeliver: async () => ({}), reject: async () => ({}), registerReturn: async () => ({}),
+      list: async () => [], approve: async () => ({ estado: 'listo_retiro' }), deliver: async () => ({ estado: 'activo' }), reject: async () => ({}), registerReturn: async () => ({}),
       createDirectLoan: async () => ({ id: 5, codigo: 'SOL-DIRECTO', estado: 'activo' }),
     },
     adminService: { listStaff: async () => [], createBook: async () => ({}), updateBook: async () => ({}), uploadCover: async () => ({}), uploadDigital: async () => ({}), createStaff: async () => ({}), updateStaff: async () => ({}), resetPassword: async () => ({}) },
@@ -96,6 +96,14 @@ test('permite al personal registrar un préstamo directo', async () => {
   const response = await request(app).post('/api/prestamos/directo').set('Authorization', 'Bearer staff').send({}).expect(201);
   assert.equal(response.body.item.estado, 'activo');
   assert.equal(response.body.item.codigo, 'SOL-DIRECTO');
+});
+
+test('separa por HTTP la aprobación de la entrega física', async () => {
+  const app = createApp({ dependencies: dependencies() });
+  const approval = await request(app).post('/api/prestamos/5/aprobar').set('Authorization', 'Bearer staff').expect(200);
+  assert.equal(approval.body.item.estado, 'listo_retiro');
+  const delivery = await request(app).post('/api/prestamos/5/entregar').set('Authorization', 'Bearer staff').send({ fecha_limite: '2099-12-31' }).expect(200);
+  assert.equal(delivery.body.item.estado, 'activo');
 });
 
 test('protege y entrega reportes institucionales como archivos adjuntos', async () => {

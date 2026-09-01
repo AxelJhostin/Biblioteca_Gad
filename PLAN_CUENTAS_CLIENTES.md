@@ -16,7 +16,7 @@ Se confirman las siguientes decisiones:
 3. El cliente puede registrarse por sí mismo.
 4. El inicio de sesión se realiza con cédula ecuatoriana y contraseña.
 5. Bibliotecarios y administradores pueden restablecer la contraseña de una cuenta de cliente.
-6. No se incorporan notificaciones, reservas, multas ni cancelación de solicitudes como parte de este cambio.
+6. Se incorpora únicamente el aviso interno de material listo para retirar en **Mi cuenta**. No se incorporan correo, WhatsApp, SMS, reservas generales, multas ni cancelación de solicitudes.
 
 Este requerimiento reemplaza la decisión anterior que establecía solicitudes físicas sin autenticación. El resto de las reglas de préstamo, disponibilidad, concurrencia, devolución y movimientos se conserva.
 
@@ -68,7 +68,8 @@ Agregar materiales al resumen no crea todavía una solicitud ni aparta ejemplare
 ### 4.2 Funciones del cliente autenticado
 
 - Solicitar uno o varios materiales físicos disponibles.
-- Consultar el estado de sus solicitudes: `pendiente`, `activo`, `atrasado`, `devuelto` o `rechazado`.
+- Consultar el estado de sus solicitudes: `pendiente`, `listo_retiro`, `activo`, `atrasado`, `devuelto` o `rechazado`.
+- Ver un aviso interno destacado cuando el personal aprueba una solicitud y puede retirarla.
 - Ver código, fecha, materiales y cantidades de cada solicitud o préstamo.
 - Consultar fecha límite y cantidades pendientes de devolución.
 - Consultar su historial personal.
@@ -347,7 +348,7 @@ La ruta pública actual `POST /api/solicitudes` debe dejar de aceptar solicitude
 | `/cuenta/registro` | Crear cuenta | Cédula, nombre, contacto, contraseña y confirmación. |
 | `/cuenta/activar` | Activar cuenta previa | Cédula, contacto, código previo y nueva contraseña. |
 | `/cuenta/login` | Inicio de sesión | Cédula y contraseña. |
-| `/mi-cuenta` | Resumen | Solicitudes pendientes, préstamos activos/atrasados y accesos rápidos. |
+| `/mi-cuenta` | Resumen | Avisos de retiro, solicitudes pendientes, préstamos listos/activos/atrasados y accesos rápidos. |
 | `/mi-cuenta/prestamos` | Actividad | Listado e historial propio. |
 | `/mi-cuenta/prestamos/:id` | Detalle | Materiales, cantidades, fechas y estado. |
 | `/mi-cuenta/perfil` | Perfil | Datos personales editables permitidos. |

@@ -10,7 +10,7 @@
 - El Cliente puede registrarse por sí mismo con cédula ecuatoriana y contraseña. Los datos de identidad se reutilizan desde su perfil al solicitar.
 - Bibliotecarios y Administradores pueden activar cuentas para clientes existentes y restablecer contraseñas temporales; el Cliente deberá cambiarlas en su siguiente acceso.
 - Los libros digitales son de acceso libre y sin restricciones, mediante un visor embebido dentro del sistema. No se permite la descarga directa del archivo.
-- El plazo de devolución de cada préstamo se define caso por caso por el bibliotecario al momento de aprobarlo (no es un valor fijo del sistema).
+- El plazo de devolución se define caso por caso cuando el bibliotecario registra la entrega física; aprobar una solicitud no inicia todavía el préstamo.
 - No existen sanciones ni multas por atraso. Si un cliente tiene un préstamo vencido sin devolver, el sistema únicamente bloquea nuevos préstamos para esa persona hasta que devuelva lo pendiente.
 - La gestión de reservas de libros físicos no disponibles queda fuera de alcance de esta versión.
 - La biblioteca mantiene la misma identidad institucional del Municipio de Jipijapa que Rehabilitación GAD; se reutilizará el mismo archivo de logotipo como referencia visual.
@@ -30,7 +30,7 @@
 | Descripción | Sinopsis o resumen del contenido. |
 | Año de publicación | Año en que fue publicada la obra. |
 | Cantidad total | Número total de ejemplares físicos que posee la biblioteca. |
-| Cantidad disponible | Ejemplares físicos libres en este momento (total − prestados activos/atrasados − unidades apartadas por solicitudes pendientes). Se calcula, no se ingresa manualmente. |
+| Cantidad disponible | Ejemplares físicos libres en este momento (total − prestados activos/atrasados − unidades apartadas por solicitudes pendientes o listas para retiro). Se calcula, no se ingresa manualmente. |
 | ¿Disponible en digital? | Indica si existe una versión digital visualizable del libro. |
 | Archivo digital | Referencia al archivo (PDF u otro) mostrado en el visor embebido, si aplica. |
 | Imagen de portada | Imagen opcional mostrada en el catálogo y en el detalle del libro. |
@@ -91,10 +91,11 @@ Reemplaza al bloque original "Información de libro prestado": aquellas pregunta
 | Cliente | Referencia al Usuario/Cliente que solicita. |
 | Bibliotecario | Funcionario que gestionó/aprobó el préstamo. |
 | Fecha de solicitud | Cuando el cliente pide el préstamo. |
-| Fecha de entrega | Cuando el bibliotecario aprueba y entrega el o los libros. |
-| Fecha límite de devolución | Definida por el bibliotecario según el caso, al aprobar. |
+| Fecha de aprobación | Cuando el bibliotecario acepta la solicitud y el material queda listo para retiro. |
+| Fecha de entrega | Cuando el cliente retira físicamente el o los libros. |
+| Fecha límite de devolución | Definida por el bibliotecario según el caso, al registrar la entrega. |
 | Fecha real de devolución | Se registra al devolver; nula si sigue prestado. |
-| Estado | Pendiente / aprobado / rechazado / activo / devuelto / atrasado. |
+| Estado | Pendiente / listo para retirar / rechazado / activo / devuelto / atrasado. |
 
 ### 2.7 Detalle de Préstamo
 
@@ -122,7 +123,7 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 | Préstamo relacionado | Referencia opcional al préstamo afectado. |
 | Detalle o comentario | Texto breve opcional que describe la operación. |
 
-> Al aprobar un préstamo, rechazar una solicitud, registrar una devolución, ingresar un libro o editar un libro, el sistema genera obligatoriamente un Movimiento.
+> Al aprobar una solicitud, registrar su entrega, rechazarla, registrar una devolución, ingresar un libro o editar un libro, el sistema genera obligatoriamente un Movimiento.
 
 ---
 
@@ -139,12 +140,13 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 7. Enviar la solicitud física utilizando obligatoriamente la identidad de su sesión.
 8. Consultar exclusivamente sus propias solicitudes, préstamos, fechas y devoluciones.
 9. Actualizar teléfono/correo y cambiar su propia contraseña.
+10. Recibir en **Mi cuenta** un aviso interno cuando una solicitud física quede aprobada y lista para retirar. No se envían correos, SMS ni mensajes externos.
 
 ### 3.2 Bibliotecario (con autenticación)
 
 1. Revisar solicitudes de préstamo pendientes y aprobarlas o rechazarlas.
-2. Al aprobar, definir la fecha límite de devolución según el caso.
-3. Registrar la entrega física del préstamo aprobado.
+2. Al aprobar, dejar el material reservado en estado `listo_retiro`; el Cliente ve inmediatamente el aviso interno en **Mi cuenta**.
+3. Cuando el cliente se presente, registrar la entrega física y definir la fecha límite de devolución; recién entonces el préstamo queda `activo`.
 4. Registrar la devolución de libros prestados, liberando los ejemplares.
 5. Consultar el catálogo completo: existencias, cantidad disponible y detalles.
 6. Verificar disponibilidad de libros específicos.
@@ -177,12 +179,14 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 - No se puede aprobar un préstamo si la cantidad solicitada de un libro supera la cantidad disponible.
 - Un préstamo puede incluir más de un ejemplar de un mismo libro.
 - Un préstamo puede incluir varios libros distintos a la vez.
-- No se puede generar un nuevo préstamo si el cliente tiene préstamos pendientes por devolver (activos o atrasados).
+- No se puede generar un nuevo préstamo si el cliente tiene un préstamo listo para retirar, activo o atrasado.
 - El préstamo directo registrado por personal aplica las mismas validaciones de cliente, disponibilidad, concurrencia y bloqueo que una solicitud pública.
 - Si un préstamo supera su fecha límite de devolución sin haberse devuelto, cambia a estado "atrasado"; esto no genera multas, solo bloquea nuevos préstamos para ese cliente hasta que devuelva lo pendiente.
-- La cantidad disponible de un libro se recalcula automáticamente al registrar una solicitud válida (para apartar unidades), al rechazarla, al aprobar/entregar el préstamo y al registrar una devolución.
+- La cantidad disponible de un libro se recalcula automáticamente al registrar una solicitud válida (para apartar unidades), al rechazarla, al aprobarla, al entregarla y al registrar una devolución. El estado `listo_retiro` mantiene las unidades apartadas.
 - Al crear solicitudes concurrentes por el último ejemplar disponible, la primera solicitud válida en orden de fecha y hora aparta la unidad. Las solicitudes posteriores sin disponibilidad se rechazan automáticamente; no se crea una reserva o lista de espera.
 - Rechazar una solicitud únicamente cambia su estado a `rechazado` y registra el movimiento correspondiente. No genera notificaciones ni otras acciones hacia el cliente.
+- Aprobar una solicitud cambia su estado a `listo_retiro` y genera un aviso interno visible en **Mi cuenta**. Este aviso se deriva del estado del préstamo y desaparece cuando el personal registra la entrega.
+- No se incluyen notificaciones externas por correo, WhatsApp, SMS ni servicios de terceros.
 - No se requiere un mecanismo de respaldo adicional dentro de la aplicación: la base de datos en la nube gestiona sus propios respaldos.
 - El visor digital debe funcionar con teclado y controles táctiles. En pantallas móviles se prioriza una página por vez; las transiciones se reducen si el dispositivo solicita menos movimiento.
 - Los reportes son documentos de consulta: no modifican datos y solo pueden generarse desde una sesión de personal activa.

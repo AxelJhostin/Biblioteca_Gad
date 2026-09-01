@@ -113,20 +113,22 @@ Notas:
 1. La persona puede agregar uno o varios libros físicos antes de autenticarse; la selección se conserva en el navegador.
 2. Para enviar debe registrarse o iniciar sesión con cédula y contraseña. Un cliente histórico activa su cuenta mediante contacto y código previo o con asistencia del personal.
 3. La pantalla muestra nombre, cédula y contacto de la sesión, sin permitir cambiar el propietario de la solicitud.
-4. La API obtiene `cliente_id` exclusivamente del token validado, verifica que no existan préstamos activos o atrasados y, dentro de una transacción, comprueba las existencias no comprometidas.
+4. La API obtiene `cliente_id` exclusivamente del token validado, verifica que no existan préstamos listos para retirar, activos o atrasados y, dentro de una transacción, comprueba las existencias no comprometidas.
 5. La primera solicitud válida que llega por una cantidad disponible queda en estado `pendiente` y aparta esas unidades. El orden lo determina el registro exitoso de la transacción y su fecha/hora.
 6. Si no hay unidades suficientes, la solicitud se registra automáticamente como `rechazado`, sin apartar existencias ni crear lista de espera. La respuesta informa que el material ya no está disponible.
 7. La pantalla muestra un código y la solicitud aparece inmediatamente en **Mi cuenta**. No se envía notificación externa en V1.
 
-Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo` con actor `cliente` y el detalle “Solicitud registrada” o “Solicitud rechazada automáticamente”, según el resultado. Al aprobar y entregar se registra un segundo Movimiento de préstamo con el actor de personal correspondiente.
+Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo` con actor `cliente` y el detalle “Solicitud registrada” o “Solicitud rechazada automáticamente”, según el resultado. La aprobación y la entrega física generan Movimientos separados con el actor de personal correspondiente.
 
 ### 5.4 Revisión y entrega por bibliotecario
 
 1. El bibliotecario abre la bandeja de solicitudes pendientes.
 2. Revisa datos del cliente, títulos, cantidades solicitadas, disponibilidad vigente e historial de préstamos abiertos.
 3. Puede rechazar la solicitud e ingresar una observación opcional visible solo al personal. El rechazo libera las unidades apartadas, deja el registro en `rechazado` y no notifica al cliente.
-4. Para aceptar, usa la acción **Aprobar y entregar**, define la fecha límite de devolución y confirma la entrega física.
-5. La API realiza una transacción: valida que la solicitud continúe pendiente y con sus unidades apartadas, registra fecha de aprobación y entrega, deja el préstamo en `activo` y genera el Movimiento de préstamo.
+4. Para aceptar, usa **Aprobar solicitud**. La API valida que continúe pendiente, registra la fecha y el personal, cambia a `listo_retiro` y conserva las unidades apartadas.
+5. La cuenta del Cliente muestra un aviso interno destacado con el código y los materiales: “Tu préstamo está listo para retirar”. No se crea correo, WhatsApp, SMS ni otra notificación externa.
+6. Cuando el cliente se presenta, el bibliotecario abre **Préstamos**, usa **Registrar entrega**, define la fecha límite y confirma la entrega física. Solo entonces se registran `fecha_entrega`, `fecha_limite` y estado `activo`.
+7. Cada transición se ejecuta en una transacción y genera su propio Movimiento de préstamo. El rechazo continúa sin aviso al cliente.
 
 ### 5.5 Devolución
 
@@ -140,7 +142,7 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 
 1. El bibliotecario abre **Préstamos** y selecciona **Nuevo préstamo**.
 2. Ingresa cédula ecuatoriana, nombre sin números, al menos un contacto, fecha límite y uno o varios materiales disponibles.
-3. La API bloquea los libros en orden estable, comprueba existencias y verifica que el cliente no tenga otro préstamo activo o atrasado.
+3. La API bloquea los libros en orden estable, comprueba existencias y verifica que el cliente no tenga otro préstamo listo para retirar, activo o atrasado.
 4. En una sola transacción se crea el préstamo `activo`, se registran aprobación y entrega con el personal autenticado y se genera su Movimiento.
 5. Si falta disponibilidad o el cliente está bloqueado, no se crea un préstamo parcial y la interfaz explica el motivo.
 
@@ -149,7 +151,7 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 - Un préstamo con unidades pendientes pasa a `atrasado` cuando la fecha local de la biblioteca supera su fecha límite.
 - El estado se recalcula al consultar préstamos y mediante una tarea programada diaria; así no depende de que un usuario abra una página.
 - No se aplican multas ni sanciones.
-- Mientras el cliente tenga uno o más préstamos `activo` o `atrasado`, la API rechaza nuevas solicitudes. Las solicitudes pendientes previas pueden seguir siendo revisadas, pero no deben aprobarse si en ese momento ya existe un préstamo abierto.
+- Mientras el cliente tenga un préstamo `listo_retiro`, `activo` o `atrasado`, la API rechaza nuevas solicitudes. Las solicitudes pendientes previas pueden seguir siendo revisadas, pero no deben aprobarse si en ese momento ya existe otro préstamo abierto.
 
 ### 5.7 Exportación de reportes
 
@@ -171,7 +173,7 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 | RN-04 | Una solicitud debe contener al menos una línea de libro y cada cantidad debe ser un entero positivo. |
 | RN-05 | No se puede solicitar una cantidad superior a la disponible al instante de registrar la solicitud; una solicitud sin stock suficiente queda automáticamente `rechazado`. |
 | RN-06 | El registro de la solicitud bloquea las filas de libros afectadas dentro de una transacción. Así, la primera solicitud válida por el último ejemplar aparta la unidad y las posteriores no pueden sobreasignarla. |
-| RN-07 | Un cliente con préstamo `activo` o `atrasado` no puede crear ni recibir la aprobación de un nuevo préstamo. |
+| RN-07 | Un cliente con préstamo `listo_retiro`, `activo` o `atrasado` no puede crear ni recibir la aprobación de un nuevo préstamo. |
 | RN-08 | El plazo de devolución es obligatorio, se establece por préstamo al entregarlo y debe ser igual o posterior a la fecha de entrega. |
 | RN-09 | Los préstamos vencidos no generan multa; solamente conservan el bloqueo definido en RN-07. |
 | RN-10 | Un rechazo libera cualquier unidad previamente apartada por la solicitud. Una devolución parcial libera únicamente las unidades recibidas. |
@@ -218,13 +220,14 @@ clientes / cuentas_personal ──< movimientos >── libros / prestamos
 
 | Estado | Significado | Modifica disponibilidad | Transiciones permitidas |
 |---|---|:---:|---|
-| `pendiente` | Solicitud pública a la espera de revisión; sus unidades están apartadas por orden de llegada. | Sí | `activo`, `rechazado` |
+| `pendiente` | Solicitud pública a la espera de revisión; sus unidades están apartadas por orden de llegada. | Sí | `listo_retiro`, `rechazado` |
+| `listo_retiro` | Solicitud aprobada y notificada internamente al Cliente; aún no existe entrega ni fecha límite. | Sí | `activo` |
 | `activo` | Aprobado y entregado físicamente. | Sí | `atrasado`, `devuelto` |
 | `atrasado` | Tiene unidades pendientes después de la fecha límite. | Sí | `devuelto` |
 | `devuelto` | Todas las unidades fueron recibidas. | No | Ninguna |
 | `rechazado` | Solicitud no aceptada, de forma manual o automática por falta de disponibilidad. | No | Ninguna |
 
-El estado `aprobado` mencionado en el levantamiento queda registrado mediante `fecha_aprobacion`, `bibliotecario_id` y el Movimiento de préstamo. En V1 la interfaz une aprobación y entrega en una sola acción atómica, por lo que no deja préstamos reservados sin entregar. Las cantidades de una solicitud pendiente ya estaban apartadas exclusivamente para respetar el orden de llegada; esto no constituye un módulo de reservas ni una lista de espera.
+El estado funcional “aprobado” se implementa como `listo_retiro`, acompañado por `fecha_aprobacion`, `bibliotecario_id` y un Movimiento. La interfaz separa aprobación y entrega para que el Cliente sepa cuándo acudir. Tanto `pendiente` como `listo_retiro` apartan unidades; esto no constituye una lista de espera ni un módulo general de reservas.
 
 ### 7.4 Catálogos controlados
 
@@ -250,9 +253,9 @@ El estado `aprobado` mencionado en el levantamiento queda registrado mediante `f
 
 | Módulo | Bibliotecario | Administrador | Función |
 |---|:---:|:---:|---|
-| Inicio | Sí | Sí | Indicadores operativos: solicitudes pendientes, préstamos activos y atrasados. No sustituye reportes. |
-| Solicitudes | Sí | Sí | Filtrar, ver detalle, aprobar y entregar o rechazar. |
-| Préstamos | Sí | Sí | Buscar, consultar vencimientos, registrar devoluciones y exportar PDF/Excel. |
+| Inicio | Sí | Sí | Indicadores operativos: pendientes, listos para retirar, activos y atrasados. No sustituye reportes. |
+| Solicitudes | Sí | Sí | Filtrar, ver detalle, aprobar para retiro o rechazar. |
+| Préstamos | Sí | Sí | Buscar, registrar entrega de material listo, consultar vencimientos, registrar devoluciones y exportar PDF/Excel. |
 | Préstamo directo | Sí | Sí | Registrar datos del cliente, seleccionar materiales disponibles y entregar en una operación. |
 | Catálogo | Consulta | Gestión total | Existencias, ficha, alta, edición, estado y exportación de inventario. |
 | Autores | Consulta | Gestión total | Crear, editar y asociar autores. |
@@ -334,9 +337,10 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 | `POST` | `/api/clientes/:id/restablecer-password` | Bibliotecario/Admin | Restablecer e invalidar sesiones anteriores. |
 | `POST` | `/api/auth/login` | Público | Login de personal. |
 | `GET` | `/api/auth/me` | Personal | Validar y recuperar sesión. |
-| `GET` | `/api/prestamos` | Bibliotecario/Admin | Listar préstamos activos, atrasados e historial. |
+| `GET` | `/api/prestamos` | Bibliotecario/Admin | Listar solicitudes y préstamos por cualquiera de sus estados. |
 | `POST` | `/api/prestamos/directo` | Bibliotecario/Admin | Registrar y entregar un préstamo presencial en una transacción. |
-| `POST` | `/api/prestamos/:id/aprobar-entregar` | Bibliotecario/Admin | Definir fecha límite y activar una solicitud pendiente. |
+| `POST` | `/api/prestamos/:id/aprobar` | Bibliotecario/Admin | Aprobar una solicitud pendiente y dejarla lista para retiro. |
+| `POST` | `/api/prestamos/:id/entregar` | Bibliotecario/Admin | Registrar retiro, fecha límite y activar el préstamo. |
 | `POST` | `/api/prestamos/:id/rechazar` | Bibliotecario/Admin | Rechazar una solicitud pendiente. |
 | `POST` | `/api/prestamos/:id/devoluciones` | Bibliotecario/Admin | Registrar devolución por líneas y cantidades. |
 | `GET` | `/api/admin/libros` | Admin | Catálogo administrativo. |
@@ -416,8 +420,8 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 1. Una persona sin iniciar sesión puede navegar el catálogo y encontrar un libro por título, autor, género o tipo de material; ve portada cuando existe y su disponibilidad real.
 2. Un libro con varios autores los muestra y conserva todas sus asociaciones.
 3. Una persona puede preparar libros sin sesión, pero debe registrar o activar una cuenta para enviar la solicitud.
-4. La solicitud utiliza el Cliente de la sesión y falla si supera disponibilidad o el cliente tiene préstamo activo/atrasado.
-5. Un bibliotecario puede aprobar y entregar una solicitud indicando una fecha límite; las cantidades pasan a no estar disponibles.
+4. La solicitud utiliza el Cliente de la sesión y falla si supera disponibilidad o el cliente tiene un préstamo listo para retirar, activo o atrasado.
+5. Un bibliotecario puede aprobar una solicitud, que queda `listo_retiro` y muestra un aviso interno al Cliente; al entregarla define la fecha límite y pasa a `activo`. Las cantidades permanecen no disponibles durante ambas etapas.
 6. Dos operaciones concurrentes no pueden dejar disponibilidad negativa: la primera solicitud válida por el último ejemplar lo aparta y las posteriores sin stock quedan rechazadas automáticamente.
 7. Un préstamo pasa a atrasado al superar su fecha límite y el cliente queda bloqueado, sin multas.
 8. Una devolución parcial libera solo las unidades efectivamente recibidas; una devolución total cierra el préstamo.
@@ -428,6 +432,7 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 13. Personal autenticado descarga inventario y préstamos en PDF/Excel; solo el Administrador descarga Movimientos. Los archivos muestran identidad municipal, responsable, filtros y total.
 14. Los recorridos críticos de catálogo/solicitud móvil, cuenta Cliente, login de personal y descargas se ejecutan mediante pruebas E2E repetibles.
 15. El Cliente consulta solo su historial, actualiza su contacto y cambia contraseña; personal puede restablecerla sin ver ni registrar el secreto.
+16. El rechazo no genera aviso; la aprobación sí genera únicamente un aviso interno en **Mi cuenta**, sin correo, WhatsApp ni SMS.
 
 ## 16. Decisiones pendientes antes de producción
 
@@ -441,7 +446,7 @@ Estas decisiones no bloquean la construcción de la base, pero deben confirmarse
 | Contacto | Teléfono ecuatoriano y/o correo obligatorio. El teléfono, si se ingresa, es celular `09` de 10 dígitos o fijo nacional de 9 dígitos. | Confirmado para V1. |
 | Identificación | Cédula ecuatoriana única de exactamente 10 dígitos numéricos. | Confirmado para V1. |
 | Reportes | Inventario, préstamos y movimientos se exportan en PDF/Excel institucional. | Definir únicamente si se requieren indicadores o reportes adicionales. |
-| Notificaciones | No hay notificaciones externas en V1. | Confirmar necesidad de correo, WhatsApp o recordatorios. |
+| Notificaciones | La aprobación muestra un aviso interno en **Mi cuenta** derivado de `listo_retiro`; no hay correo, WhatsApp ni SMS en V1. | Confirmar únicamente si una versión futura requiere canales externos o recordatorios. |
 
 ---
 
