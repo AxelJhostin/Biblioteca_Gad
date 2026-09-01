@@ -22,7 +22,14 @@ export default function AdminCatalog() {
   const edit = async (book) => {
     const { data } = await api.get(`/catalogo/${book.id}`);
     setSelected(book.id); setShowForm(true); setCover(null); setDigital(null);
-    setForm({ ...empty, ...data.item, autores_texto: data.item.autores.map((author) => author.nombre_completo).join(', ') });
+    setForm({
+      ...empty,
+      ...data.item,
+      tipo_material_otro: data.item.tipo_material_otro || '',
+      genero_otro: data.item.genero_otro || '',
+      descripcion: data.item.descripcion || '',
+      autores_texto: data.item.autores.map((author) => author.nombre_completo).join(', '),
+    });
   };
   const create = () => { setSelected(null); setForm(empty); setCover(null); setDigital(null); setShowForm(true); };
   const view = async (book) => {
@@ -40,7 +47,10 @@ export default function AdminCatalog() {
       if (digital) { const body = new FormData(); body.append('archivo', digital); await api.post(`/admin/libros/${id}/digital`, body); }
       Swal.fire({ icon: 'success', title: selected ? 'Libro actualizado' : 'Libro registrado', confirmButtonColor: '#3FAE9A' });
       setShowForm(false); load();
-    } catch (error) { Swal.fire({ icon: 'error', title: 'No se guardó', text: error.response?.data?.message || 'Revise los datos.', confirmButtonColor: '#F2705B' }); }
+    } catch (error) {
+      const details = error.response?.data?.errors?.map((item) => item.message).join(' ') || error.response?.data?.message || 'Revise los datos.';
+      Swal.fire({ icon: 'error', title: 'No se guardó', text: details, confirmButtonColor: '#F2705B' });
+    }
   };
   const visibleItems = items.filter((book) => {
     const term = search.trim().toLocaleLowerCase('es');

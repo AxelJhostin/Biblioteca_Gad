@@ -71,7 +71,7 @@ export default function Catalog() {
               {data.items.map((book) => <div className="col-sm-6 col-lg-4 col-xl-3" key={book.id}>
                 <article className="book-card">
                   <Link to={`/libros/${book.id}`} className="book-cover">
-                    {book.tiene_portada ? <img src={apiFileUrl(`/api/catalogo/${book.id}/portada`)} alt={`Portada de ${book.titulo}`} /> : <div className="cover-placeholder"><i className="fas fa-book" /><span>Biblioteca<br />Municipal</span></div>}
+                    {book.tiene_portada ? <img src={apiFileUrl(`/api/catalogo/${book.id}/portada`)} alt={`Portada de ${book.titulo}`} loading="lazy" decoding="async" /> : <div className="cover-placeholder"><i className="fas fa-book" /><span>Biblioteca<br />Municipal</span></div>}
                     {book.digital_disponible && <span className="digital-ribbon"><i className="fas fa-tablet-screen-button" /> Digital</span>}
                   </Link>
                   <div className="book-card-body">

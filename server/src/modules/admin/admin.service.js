@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import sharp from 'sharp';
 import { z } from 'zod';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors.js';
 import { cleanText } from '../../core/validation.js';
@@ -6,12 +7,12 @@ import { cleanText } from '../../core/validation.js';
 const bookSchema = z.object({
   id_libro_texto: z.string().min(1).max(120),
   tipo_material: z.enum(['libro', 'revista', 'folleto', 'tesis', 'otro']),
-  tipo_material_otro: z.string().max(100).optional().default(''),
+  tipo_material_otro: z.string().max(100).nullish().transform((value) => value ?? ''),
   genero: z.enum(['lirico', 'poesia', 'narrativa', 'ensayo', 'otro']),
-  genero_otro: z.string().max(100).optional().default(''),
+  genero_otro: z.string().max(100).nullish().transform((value) => value ?? ''),
   titulo: z.string().min(1).max(260),
-  descripcion: z.string().max(5000).optional().default(''),
-  anio_publicacion: z.union([z.literal(''), z.coerce.number().int().min(1000).max(2200)]).optional(),
+  descripcion: z.string().max(5000).nullish().transform((value) => value ?? ''),
+  anio_publicacion: z.union([z.literal(''), z.null(), z.coerce.number().int().min(1000).max(2200)]).optional(),
   cantidad_total: z.coerce.number().int().min(0),
   autores: z.array(z.string().min(2).max(180)).min(1).max(20),
   activo: z.boolean().optional().default(true),
@@ -85,12 +86,21 @@ export function createAdminService({ repository, storage, coversBucket, digitalB
       }
       const current = await repository.lockBook(null, id);
       if (!current) throw new NotFoundError('Libro no encontrado.');
-      const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[file.mimetype];
+      let optimizedCover;
+      try {
+        optimizedCover = await sharp(file.buffer)
+          .rotate()
+          .resize({ width: 800, height: 1200, fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 80, effort: 4 })
+          .toBuffer();
+      } catch {
+        throw new ValidationError('No pudimos procesar la imagen de portada. Seleccione una imagen válida.');
+      }
       const storagePath = await storage.upload({
-        bucket: coversBucket, objectPath: `${id}/${Date.now()}-${crypto.randomUUID()}.${ext}`,
-        buffer: file.buffer, contentType: file.mimetype,
+        bucket: coversBucket, objectPath: `${id}/${Date.now()}-${crypto.randomUUID()}.webp`,
+        buffer: optimizedCover, contentType: 'image/webp',
       });
-      await repository.updateCover(id, storagePath, file.mimetype);
+      await repository.updateCover(id, storagePath, 'image/webp');
       await repository.addMovement(null, {
         tipo: 'edicion_libro', tipo_actor: staff.rol, cuenta_personal_id: staff.id,
         actor_nombre: staff.nombre_completo, libro_id: id, detalle: 'Actualización de portada.',
@@ -142,4 +152,3 @@ export function createAdminService({ repository, storage, coversBucket, digitalB
     },
   };
 }
-
