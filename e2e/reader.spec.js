@@ -17,7 +17,7 @@ function digitalBookFixture(totalPages = 5) {
   });
 }
 
-test('lector permite zoom, pliegos y adaptación móvil', async ({ page }) => {
+test('lector permite zoom, pliegos, pantalla completa y adaptación móvil', async ({ page }) => {
   const pdf = await digitalBookFixture();
   await page.route('**/api/catalogo/999/visor', (route) => route.fulfill({
     status: 200,
@@ -33,6 +33,7 @@ test('lector permite zoom, pliegos y adaptación móvil', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/libros/999/leer');
   await expect(page.getByText('1 / 5')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ver en pantalla completa' })).toBeVisible();
   const reader = page.locator('.reader-shell');
   await expect.poll(() => reader.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
   await reader.hover();

@@ -24,6 +24,8 @@ export default function Reader() {
   const [viewMode, setViewMode] = useState('single');
   const [compact, setCompact] = useState(false);
   const [turn, setTurn] = useState({ direction: 'next', sequence: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const readerPage = useRef(null);
   const shell = useRef(null);
   const touchStart = useRef(null);
 
@@ -47,6 +49,12 @@ export default function Reader() {
       observer?.disconnect();
       window.removeEventListener('resize', update);
     };
+  }, []);
+
+  useEffect(() => {
+    const updateFullscreenState = () => setIsFullscreen(document.fullscreenElement === readerPage.current);
+    document.addEventListener('fullscreenchange', updateFullscreenState);
+    return () => document.removeEventListener('fullscreenchange', updateFullscreenState);
   }, []);
 
   const displayedPages = useMemo(
@@ -85,6 +93,15 @@ export default function Reader() {
     setTurn((value) => ({ direction: 'next', sequence: value.sequence + 1 }));
   }, [compact, pages]);
 
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await readerPage.current?.requestFullscreen();
+    } catch {
+      // Algunos navegadores o contextos embebidos no permiten pantalla completa.
+    }
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (event) => {
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target?.tagName)) return;
@@ -103,11 +120,14 @@ export default function Reader() {
       } else if (event.key === '0') {
         event.preventDefault();
         setZoom(1);
+      } else if (event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        toggleFullscreen();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [next, previous]);
+  }, [next, previous, toggleFullscreen]);
 
   const onTouchStart = (event) => {
     touchStart.current = event.changedTouches[0]?.clientX ?? null;
@@ -124,7 +144,7 @@ export default function Reader() {
     ? `Páginas ${displayedPages[0]}–${displayedPages.at(-1)} de ${pages}`
     : `Página ${displayedPages[0] || page} de ${pages || '—'}`;
 
-  return <div className="reader-page">
+  return <div className="reader-page" ref={readerPage}>
     <header className="reader-toolbar">
       <div className="reader-toolbar-main">
         <Link to={`/libros/${id}`} aria-label="Volver al detalle del libro"><i className="fas fa-arrow-left" /> <span>Volver</span></Link>
@@ -144,6 +164,11 @@ export default function Reader() {
           <button type="button" onClick={() => changeZoom(zoom - READER_ZOOM_STEP)} disabled={zoom <= 0.5} aria-label="Alejar" title="Alejar (−)"><i className="fas fa-magnifying-glass-minus" /></button>
           <button type="button" className="reader-zoom-value" onClick={() => changeZoom(1)} aria-label={`Restablecer zoom, actualmente ${Math.round(zoom * 100)} por ciento`} title="Restablecer zoom (0)">{Math.round(zoom * 100)}%</button>
           <button type="button" onClick={() => changeZoom(zoom + READER_ZOOM_STEP)} disabled={zoom >= 2} aria-label="Acercar" title="Acercar (+)"><i className="fas fa-magnifying-glass-plus" /></button>
+        </div>
+        <div className="reader-tool-group" aria-label="Pantalla completa">
+          <button type="button" onClick={toggleFullscreen} aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Ver en pantalla completa'} aria-pressed={isFullscreen} title={isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Ver en pantalla completa (F)'}>
+            <i className={`fas ${isFullscreen ? 'fa-compress' : 'fa-expand'}`} /><span>{isFullscreen ? 'Salir' : 'Pantalla completa'}</span>
+          </button>
         </div>
       </div>
     </header>
