@@ -26,13 +26,18 @@ La base funcional incluye:
 - Exportación de inventario, préstamos y movimientos en PDF/Excel con formato municipal.
 - Pruebas unitarias, integración HTTP, E2E con navegador y compilación de producción.
 
-Los requisitos que gobiernan el desarrollo están en [Requerimientos_Biblioteca_Municipal.md](./Requerimientos_Biblioteca_Municipal.md) y [ESPECIFICACION_FUNCIONAL_TECNICA_BIBLIOTECA.md](./ESPECIFICACION_FUNCIONAL_TECNICA_BIBLIOTECA.md).
+## Documentación
 
-El despliegue completo en Supabase, Render y Vercel está documentado en [DEPLOY_SUPABASE_RENDER.md](./DEPLOY_SUPABASE_RENDER.md). La sustitución del Supabase anterior permanece preparada pero aplazada; ningún dato remoto fue modificado.
+La documentación vigente está centralizada en `docs/`:
 
-La situación de cierre, el procedimiento de relevo y la lista de entrega institucional están en [ENTREGA_FINAL_PASANTIA.md](./ENTREGA_FINAL_PASANTIA.md). La implementación de cuentas de clientes sigue el diseño de [PLAN_CUENTAS_CLIENTES.md](./PLAN_CUENTAS_CLIENTES.md).
+| Documento | Propósito |
+|---|---|
+| [Requerimientos de la Biblioteca Municipal](./docs/Requerimientos_Biblioteca_Municipal.md) | Alcance aprobado, entidades, funciones por rol y reglas de negocio. |
+| [Especificación funcional y técnica](./docs/ESPECIFICACION_FUNCIONAL_TECNICA_BIBLIOTECA.md) | Flujos, arquitectura, API, seguridad y criterios de aceptación. |
+| [Guía de despliegue](./docs/DEPLOY_SUPABASE_RENDER.md) | Preparación de Supabase, Render y Vercel. |
+| [Credenciales locales de prueba](./docs/CREDENCIALES_PRUEBA_LOCAL.md) | Cuentas demo y recorrido recomendado de validación. |
 
-Las cuentas y el recorrido recomendado para pruebas locales están documentados en [CREDENCIALES_PRUEBA_LOCAL.md](./CREDENCIALES_PRUEBA_LOCAL.md).
+Los planes temporales y documentos históricos se retiraron al quedar su contenido consolidado en estos archivos. La sustitución del Supabase anterior permanece aplazada y ningún dato remoto fue modificado.
 
 ## Arquitectura
 
@@ -65,6 +70,12 @@ supabase/
 ├── migrations/                 esquema PostgreSQL reproducible
 ├── config.toml                 entorno local oficial de Supabase
 └── seed.sql                    punto de entrada para datos iniciales
+
+docs/                           documentación vigente del proyecto
+├── Requerimientos_Biblioteca_Municipal.md
+├── ESPECIFICACION_FUNCIONAL_TECNICA_BIBLIOTECA.md
+├── DEPLOY_SUPABASE_RENDER.md
+└── CREDENCIALES_PRUEBA_LOCAL.md
 ```
 
 La API Express es el único acceso de la aplicación a PostgreSQL. El navegador no recibe credenciales de base de datos ni la clave secreta de Supabase.
@@ -243,6 +254,7 @@ La suite cubre actualmente:
 - Protección HTTP y permisos de descarga.
 - Flujo público y validaciones desde una pantalla móvil real.
 - Login administrativo y descargas PDF/Excel desde el panel.
+- Aprobación separada de la entrega y aviso interno de material listo para retirar.
 
 Antes de fusionar una entrega:
 
@@ -393,3 +405,15 @@ npx supabase migration new nombre_descriptivo
 ```
 
 No edite una migración que ya haya sido aplicada en producción; cree una nueva.
+
+## Lista de entrega
+
+Antes de publicar el sistema para uso institucional:
+
+1. Ejecutar `npm run qa:full` con Supabase local y Docker activos.
+2. Crear o seleccionar el proyecto de Supabase de producción y revisar las migraciones antes de aplicarlas.
+3. Configurar secretos y contraseñas nuevos en Supabase y Render; no reutilizar las credenciales locales de prueba.
+4. Desplegar la API en Render y configurar su URL como `VITE_API_URL` en Vercel.
+5. Confirmar `CLIENT_URL`, CORS, Storage privado y acceso a los archivos digitales.
+6. Probar con los tres roles el recorrido de solicitud, aprobación, retiro, entrega y devolución.
+7. Entregar las credenciales definitivas únicamente al responsable designado por el Municipio.

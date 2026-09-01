@@ -1,11 +1,11 @@
 # Especificación funcional y técnica — Sistema de Gestión de Biblioteca Municipal
 
-**Versión:** 1.2
+**Versión:** 1.3
 
 **Fecha:** 1 de septiembre de 2026
 
 **Estado:** Implementado y validado localmente
-**Documento fuente:** `Requerimientos_Biblioteca_Municipal.md`
+**Documento fuente:** [Requerimientos de la Biblioteca Municipal](./Requerimientos_Biblioteca_Municipal.md)
 
 ---
 
@@ -180,7 +180,7 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 | RN-11 | La fecha real de devolución se completa solo cuando todas las líneas del préstamo fueron devueltas. |
 | RN-12 | Solo un administrador puede modificar catálogo, archivos digitales o cuentas del personal. |
 | RN-13 | La lectura digital es pública cuando el libro está marcado como digital y tiene un archivo activo; el archivo no se ofrece como descarga. |
-| RN-14 | Aprobar préstamo, rechazar solicitud, registrar devolución, ingresar libro y editar libro generan obligatoriamente un Movimiento con actor, fecha/hora, referencias y detalle opcional. |
+| RN-14 | Aprobar una solicitud, registrar su entrega, rechazarla, registrar una devolución, ingresar un libro y editarlo generan obligatoriamente un Movimiento con actor, fecha/hora, referencias y detalle opcional. |
 | RN-15 | Al registrar o identificar un Cliente, la cédula contiene exactamente 10 dígitos; el nombre no admite números; y el teléfono, cuando se proporciona, debe ser un celular ecuatoriano `09` de 10 dígitos o un fijo nacional de 9 dígitos. |
 | RN-16 | Inventario y préstamos pueden exportarse por ambos roles internos; Movimientos solo por Administrador. Los documentos respetan filtros, registran responsable y no modifican datos. |
 | RN-17 | La API determina el propietario de una solicitud desde la sesión Cliente, nunca desde una cédula enviada en el formulario. |
@@ -404,7 +404,7 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 6. Si existen préstamos físicos al momento de salida, importarlos como `activo` con sus fechas y cantidades pendientes para preservar disponibilidad y bloqueos.
 7. Cargar archivos digitales únicamente cuando se confirme la titularidad y autorización de publicación de cada obra.
 
-## 14. Plan de implementación
+## 14. Estado de implementación
 
 | Fase | Entregable | Resultado verificable |
 |---|---|---|

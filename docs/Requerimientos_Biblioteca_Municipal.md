@@ -1,5 +1,5 @@
 # Sistema de Gestión — Biblioteca Municipal
-## Documento de Análisis de Requerimientos (versión 2.0)
+## Documento de Análisis de Requerimientos (versión 2.1)
 
 ---
 

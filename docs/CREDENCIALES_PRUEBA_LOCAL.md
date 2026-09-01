@@ -1,4 +1,4 @@
-# Credenciales de prueba local
+# Credenciales locales de prueba
 
 Estas cuentas existen únicamente para probar el Sistema de Biblioteca Municipal con Supabase local y Docker. No deben utilizarse en producción ni copiarse a Render, Vercel o un proyecto remoto de Supabase.
 
@@ -49,4 +49,3 @@ npm run dev
 - Antes de desplegar, deben configurarse contraseñas nuevas y secretos seguros mediante variables de entorno.
 - El archivo `server/.env` no debe subirse al repositorio.
 - `npm run local:reset` elimina cualquier dato ingresado manualmente en la base local.
-

@@ -1,4 +1,4 @@
-# Despliegue en Supabase, Render y Vercel
+# Guía de despliegue en Supabase, Render y Vercel
 
 > Estado actual: no se ha modificado ni eliminado ningún dato del Supabase
 > remoto de Rehabilitación GAD. Todo lo descrito aquí queda preparado para una
