@@ -32,6 +32,8 @@ El despliegue completo en Supabase, Render y Vercel está documentado en [DEPLOY
 
 La situación de cierre, el procedimiento de relevo y la lista de entrega institucional están en [ENTREGA_FINAL_PASANTIA.md](./ENTREGA_FINAL_PASANTIA.md). La implementación de cuentas de clientes sigue el diseño de [PLAN_CUENTAS_CLIENTES.md](./PLAN_CUENTAS_CLIENTES.md).
 
+Las cuentas y el recorrido recomendado para pruebas locales están documentados en [CREDENCIALES_PRUEBA_LOCAL.md](./CREDENCIALES_PRUEBA_LOCAL.md).
+
 ## Arquitectura
 
 ```text
