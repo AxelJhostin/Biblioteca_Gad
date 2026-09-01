@@ -19,9 +19,8 @@ export default function PublicLayout() {
               <i className="fas fa-book-open-reader me-2" />Solicitud
               {items.length > 0 && <span className="cart-count">{items.length}</span>}
             </Link>
-            {user ? <div className="public-account-actions"><Link to="/mi-cuenta" className="btn btn-outline-success"><i className="fas fa-user me-md-2" /><span className="d-none d-md-inline">Mi cuenta</span></Link><button type="button" className="btn btn-light d-none d-lg-inline-flex" onClick={logout} title="Cerrar sesión"><i className="fas fa-right-from-bracket" /></button></div>
+            {user ? <div className="public-account-actions"><Link to="/mi-cuenta" className="btn btn-outline-success"><i className="fas fa-user me-md-2" /><span className="d-none d-md-inline">Mi cuenta</span></Link><button type="button" className="btn btn-light d-none d-lg-inline-flex align-items-center gap-2" onClick={logout} title="Cerrar sesión"><i className="fas fa-right-from-bracket" /><span>Salir</span></button></div>
               : <Link to="/cuenta/login" className="btn btn-outline-success"><i className="fas fa-user me-md-2" /><span className="d-none d-md-inline">Ingresar</span></Link>}
-            {!user && <Link to="/personal/login" className="btn btn-outline-success d-none d-md-inline-flex">Personal</Link>}
           </nav>
         </div>
       </header>
