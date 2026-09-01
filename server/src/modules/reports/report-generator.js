@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
+import writeExcelFile from 'write-excel-file/node';
 
 const COLORS = {
   teal: '#2F8C7C',
@@ -145,106 +145,129 @@ export async function generatePdf(report, meta = {}) {
   return completed;
 }
 
-function excelColor(hex) {
-  return { argb: hex.replace('#', '').toUpperCase() };
+function mergedRow(value, columnCount, style = {}) {
+  return [
+    { value, columnSpan: columnCount, ...style },
+    ...Array.from({ length: Math.max(0, columnCount - 1) }, () => null),
+  ];
 }
+
+function excelColumnLabel(columnNumber) {
+  let value = columnNumber;
+  let label = '';
+  while (value > 0) {
+    value -= 1;
+    label = String.fromCharCode(65 + (value % 26)) + label;
+    value = Math.floor(value / 26);
+  }
+  return label;
+}
+
+const autoFilterFeature = {
+  files: {
+    transform: {
+      'xl/worksheets/sheet{id}.xml': {
+        transform(xml, sheetOptions) {
+          if (!sheetOptions.autoFilterRange) return xml;
+          return xml.replace(
+            '<mergeCells',
+            `<autoFilter ref="${sheetOptions.autoFilterRange}"/><mergeCells`,
+          );
+        },
+      },
+    },
+  },
+};
 
 export async function generateXlsx(report, meta = {}) {
   const generatedAt = meta.generatedAt || new Date();
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Biblioteca Municipal de Jipijapa';
-  workbook.lastModifiedBy = actorLabel(meta.actor);
-  workbook.created = generatedAt;
-  workbook.modified = generatedAt;
-  workbook.subject = report.subtitle;
-  workbook.title = report.title;
-  workbook.company = 'Gobierno Autónomo Descentralizado Municipal del Cantón Jipijapa';
-
-  const sheet = workbook.addWorksheet(report.shortTitle, {
-    properties: { tabColor: excelColor(COLORS.teal) },
-    pageSetup: {
-      orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
-      margins: { left: 0.25, right: 0.25, top: 0.5, bottom: 0.5, header: 0.2, footer: 0.2 },
-      printTitlesRow: '1:9',
-    },
-    views: [{ state: 'frozen', ySplit: 9, showGridLines: false }],
-  });
-  const lastColumn = report.columns.length;
-  sheet.columns = report.columns.map((column) => ({
-    key: column.key,
-    width: Math.max(10, Math.round(column.width / 6.2)),
-    style: { font: { name: 'Aptos', size: 10 }, alignment: { vertical: 'top', wrapText: true } },
-  }));
-
-  sheet.mergeCells(1, 1, 1, lastColumn);
-  sheet.getCell(1, 1).value = 'GOBIERNO AUTÓNOMO DESCENTRALIZADO MUNICIPAL DEL CANTÓN JIPIJAPA';
-  sheet.mergeCells(2, 1, 2, lastColumn);
-  sheet.getCell(2, 1).value = 'BIBLIOTECA MUNICIPAL';
-  sheet.mergeCells(3, 1, 3, lastColumn);
-  sheet.getCell(3, 1).value = report.title;
-  sheet.mergeCells(4, 1, 4, lastColumn);
-  sheet.getCell(4, 1).value = report.subtitle;
-  sheet.mergeCells(6, 1, 6, lastColumn);
-  sheet.getCell(6, 1).value = `Emitido: ${emittedLabel(generatedAt)}  |  Responsable: ${actorLabel(meta.actor)}`;
-  sheet.mergeCells(7, 1, 7, lastColumn);
-  sheet.getCell(7, 1).value = `Criterio: ${report.filterSummary}`;
-  sheet.mergeCells(8, 1, 8, lastColumn);
-  sheet.getCell(8, 1).value = `Total de registros: ${report.rows.length}`;
-
-  for (const rowNumber of [1, 2]) {
-    const row = sheet.getRow(rowNumber);
-    row.height = rowNumber === 1 ? 28 : 22;
-    row.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: excelColor(COLORS.tealDark) };
-      cell.font = { name: 'Aptos Display', bold: true, color: excelColor(COLORS.white), size: rowNumber === 1 ? 13 : 11 };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    });
-  }
-  sheet.getRow(3).height = 27;
-  sheet.getCell(3, 1).font = { name: 'Aptos Display', bold: true, color: excelColor(COLORS.coral), size: 16 };
-  sheet.getCell(3, 1).alignment = { horizontal: 'center', vertical: 'middle' };
-  sheet.getCell(4, 1).font = { name: 'Aptos', italic: true, color: excelColor(COLORS.muted), size: 10 };
-  sheet.getCell(4, 1).alignment = { horizontal: 'center' };
-  [6, 7, 8].forEach((rowNumber) => {
-    sheet.getRow(rowNumber).height = 20;
-    sheet.getCell(rowNumber, 1).font = { name: 'Aptos', color: excelColor(COLORS.ink), size: 9, bold: rowNumber === 8 };
-    sheet.getCell(rowNumber, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: excelColor(rowNumber === 8 ? COLORS.tealSoft : '#FBF7F2') };
-    sheet.getCell(rowNumber, 1).alignment = { vertical: 'middle', wrapText: true };
-  });
-
-  const headerRow = sheet.getRow(9);
-  headerRow.values = report.columns.map((column) => column.label);
-  headerRow.height = 28;
-  headerRow.eachCell((cell) => {
-    cell.font = { name: 'Aptos', bold: true, color: excelColor('#80531F'), size: 9 };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: excelColor(COLORS.amberSoft) };
-    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    cell.border = { bottom: { style: 'medium', color: excelColor(COLORS.coral) } };
-  });
-
-  report.rows.forEach((item, index) => {
-    const row = sheet.addRow(report.columns.map((column) => item[column.key] ?? '—'));
-    row.height = report.shortTitle === 'Movimientos' ? 36 : 42;
-    row.eachCell((cell, columnNumber) => {
-      cell.font = { name: 'Aptos', size: 9, color: excelColor(COLORS.ink) };
-      cell.alignment = {
-        horizontal: report.columns[columnNumber - 1].align || 'left', vertical: 'top', wrapText: true,
+  const columnCount = report.columns.length;
+  const titleStyle = {
+    align: 'center', alignVertical: 'center', wrap: true,
+    backgroundColor: COLORS.tealDark, textColor: COLORS.white, fontWeight: 'bold',
+  };
+  const sheetData = [
+    mergedRow('GOBIERNO AUTÓNOMO DESCENTRALIZADO MUNICIPAL DEL CANTÓN JIPIJAPA', columnCount, {
+      ...titleStyle, height: 28, fontSize: 13,
+    }),
+    mergedRow('BIBLIOTECA MUNICIPAL', columnCount, { ...titleStyle, height: 22, fontSize: 11 }),
+    mergedRow(report.title, columnCount, {
+      height: 27, align: 'center', alignVertical: 'center', wrap: true,
+      fontWeight: 'bold', fontSize: 16, textColor: COLORS.coral,
+    }),
+    mergedRow(report.subtitle, columnCount, {
+      height: 22, align: 'center', alignVertical: 'center', wrap: true,
+      fontStyle: 'italic', fontSize: 10, textColor: COLORS.muted,
+    }),
+    Array.from({ length: columnCount }, () => null),
+    mergedRow(`Emitido: ${emittedLabel(generatedAt)}  |  Responsable: ${actorLabel(meta.actor)}`, columnCount, {
+      height: 20, alignVertical: 'center', wrap: true, fontSize: 9,
+      textColor: COLORS.ink, backgroundColor: '#FBF7F2',
+    }),
+    mergedRow(`Criterio: ${report.filterSummary}`, columnCount, {
+      height: 20, alignVertical: 'center', wrap: true, fontSize: 9,
+      textColor: COLORS.ink, backgroundColor: '#FBF7F2',
+    }),
+    mergedRow(`Total de registros: ${report.rows.length}`, columnCount, {
+      height: 20, alignVertical: 'center', wrap: true, fontSize: 9, fontWeight: 'bold',
+      textColor: COLORS.ink, backgroundColor: COLORS.tealSoft,
+    }),
+    report.columns.map((column) => ({
+      value: column.label,
+      height: 28,
+      align: 'center',
+      alignVertical: 'center',
+      wrap: true,
+      fontWeight: 'bold',
+      fontSize: 9,
+      textColor: '#80531F',
+      backgroundColor: COLORS.amberSoft,
+      bottomBorderColor: COLORS.coral,
+      bottomBorderStyle: 'medium',
+    })),
+    ...report.rows.map((item, rowIndex) => report.columns.map((column) => {
+      const value = item[column.key] ?? '—';
+      return {
+        value,
+        ...(typeof value === 'string' ? { type: String, format: '@' } : {}),
+        height: report.shortTitle === 'Movimientos' ? 36 : 42,
+        align: column.align || 'left',
+        alignVertical: 'top',
+        wrap: true,
+        fontSize: 9,
+        textColor: COLORS.ink,
+        backgroundColor: rowIndex % 2 ? '#FBF7F2' : COLORS.white,
+        bottomBorderColor: COLORS.line,
+        bottomBorderStyle: 'hair',
       };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: excelColor(index % 2 ? '#FBF7F2' : COLORS.white) };
-      cell.border = { bottom: { style: 'hair', color: excelColor(COLORS.line) } };
-    });
-  });
-
-  const finalRow = Math.max(9, 9 + report.rows.length);
-  sheet.autoFilter = { from: { row: 9, column: 1 }, to: { row: finalRow, column: lastColumn } };
-  sheet.pageSetup.printArea = `A1:${sheet.getColumn(lastColumn).letter}${finalRow}`;
-  sheet.headerFooter.oddFooter = '&L Biblioteca Municipal de Jipijapa&C Documento institucional&R Página &P de &N';
-
+    })),
+  ];
   const logo = await logoBuffer(meta.logoPath);
-  if (logo) {
-    const imageId = workbook.addImage({ buffer: logo, extension: 'jpeg' });
-    sheet.addImage(imageId, { tl: { col: 0.08, row: 0.05 }, ext: { width: 54, height: 54 } });
-  }
-
-  return Buffer.from(await workbook.xlsx.writeBuffer());
+  const images = logo ? [{
+    content: logo,
+    contentType: 'image/jpeg',
+    width: 50,
+    height: 50,
+    dpi: 96,
+    anchor: { row: 1, column: 1 },
+    offsetX: 6,
+    offsetY: 2,
+    title: 'Escudo municipal de Jipijapa',
+    description: 'Identidad institucional del Gobierno Municipal del Cantón Jipijapa',
+  }] : undefined;
+  const output = await writeExcelFile(sheetData, {
+    sheet: report.shortTitle,
+    columns: report.columns.map((column) => ({ width: Math.max(10, Math.round(column.width / 6.2)) })),
+    orientation: 'landscape',
+    stickyRowsCount: 9,
+    showGridLines: false,
+    zoomScale: 0.9,
+    images,
+    autoFilterRange: `A9:${excelColumnLabel(columnCount)}${Math.max(9, 9 + report.rows.length)}`,
+  }, {
+    fontFamily: 'Aptos',
+    fontSize: 10,
+    features: [autoFilterFeature],
+  }).toBuffer();
+  return Buffer.from(output);
 }

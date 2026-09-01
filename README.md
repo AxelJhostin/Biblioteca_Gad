@@ -19,7 +19,8 @@ La base funcional incluye:
 - Gestión de catálogo, archivos digitales y cuentas del personal.
 - Restablecimiento de contraseña de bibliotecarios solo por administrador.
 - Historial funcional de Movimientos accesible al administrador.
-- Pruebas unitarias, pruebas HTTP de integración y compilación de producción.
+- Exportación de inventario, préstamos y movimientos en PDF/Excel con formato municipal.
+- Pruebas unitarias, integración HTTP, E2E con navegador y compilación de producción.
 
 Los requisitos que gobiernan el desarrollo están en [Requerimientos_Biblioteca_Municipal.md](./Requerimientos_Biblioteca_Municipal.md) y [ESPECIFICACION_FUNCIONAL_TECNICA_BIBLIOTECA.md](./ESPECIFICACION_FUNCIONAL_TECNICA_BIBLIOTECA.md).
 
@@ -46,6 +47,7 @@ server/                          Node.js + Express
 │   ├── admin/
 │   ├── movements/
 │   ├── dashboard/
+│   ├── reports/
 │   └── storage/
 ├── src/scripts/                migraciones y bootstrap de administrador
 └── test/                       pruebas unitarias e integración HTTP
@@ -64,9 +66,10 @@ La API Express es el único acceso de la aplicación a PostgreSQL. El navegador 
 - React 18, Vite 8, React Router y Axios.
 - Bootstrap 5, CSS propio, Font Awesome y SweetAlert2.
 - Express, Zod, JWT, bcrypt, Helmet y limitación de solicitudes públicas.
+- PDFKit y write-excel-file para documentos institucionales generados en el servidor.
 - PostgreSQL administrado por Supabase mediante `pg`.
 - Supabase Storage privado para portadas y documentos digitales.
-- Node Test Runner, Supertest, Vitest y Testing Library.
+- Node Test Runner, Supertest, Vitest, Testing Library y Playwright.
 
 Las versiones están fijadas y `package-lock.json` debe conservarse en el repositorio.
 
@@ -202,7 +205,10 @@ npm run dev
 | `npm run build` | Genera el frontend optimizado en `client/dist`. |
 | `npm test` | Ejecuta pruebas del servidor y cliente. |
 | `npm run test:coverage` | Ejecuta las suites con cobertura. |
+| `npm run test:e2e` | Ejecuta recorridos reales en Chromium; requiere Docker/Supabase local. |
+| `npm run test:e2e:headed` | Ejecuta los E2E mostrando el navegador. |
 | `npm run qa` | Ejecuta pruebas y compilación de producción. |
+| `npm run qa:full` | Ejecuta QA y después los E2E locales. |
 | `npm run db:migrate` | Aplica migraciones pendientes. |
 | `npm run db:seed` | Crea o actualiza las cuentas locales configuradas. |
 | `npm run db:replace:check` | Audita sin cambios si la base corresponde a Rehabilitación GAD. |
@@ -221,12 +227,23 @@ La suite cubre actualmente:
 - Protección de endpoints internos.
 - Estado local de la solicitud en React.
 - Mapeo visual de estados operativos.
+- Generación y estructura de reportes PDF/Excel.
+- Protección HTTP y permisos de descarga.
+- Flujo público y validaciones desde una pantalla móvil real.
+- Login administrativo y descargas PDF/Excel desde el panel.
 
 Antes de fusionar una entrega:
 
 ```bash
 npm audit
 npm run qa
+```
+
+Para la verificación completa con Supabase local y Chromium:
+
+```bash
+npx playwright install chromium
+npm run qa:full
 ```
 
 Para cambios de base de datos también se debe validar la migración sobre una base vacía y una base con la migración anterior aplicada.
@@ -254,6 +271,14 @@ No existe un campo editable de cantidad disponible.
 - No existe un límite de tamaño definido por la aplicación; siguen aplicando los límites técnicos del proveedor y la infraestructura.
 - Los buckets son privados y se crean desde el servidor cuando se realiza la primera carga.
 - La API entrega PDF con disposición `inline` y sin caché privada persistente.
+
+### Reportes institucionales
+
+- Inventario y préstamos: Bibliotecario y Administrador.
+- Movimientos: únicamente Administrador.
+- Formatos: PDF A4 horizontal y Excel `.xlsx` con filtros y encabezados inmovilizados.
+- Los archivos reflejan el filtro aplicado e incluyen logotipo, institución, fecha/hora, responsable y total.
+- La API genera el documento y lo entrega como descarga privada sin caché. Si existen más de 5.000 registros, solicita aplicar un filtro en lugar de truncar datos.
 
 ### Contraseñas
 
@@ -284,6 +309,9 @@ No existe un campo editable de cantidad disponible.
 | `GET/POST/PATCH` | `/api/admin/personal[/:id]` | Administrador |
 | `POST` | `/api/admin/personal/:id/restablecer-password` | Administrador |
 | `GET` | `/api/movimientos` | Administrador |
+| `GET` | `/api/reportes/inventario/:formato` | Bibliotecario/Administrador |
+| `GET` | `/api/reportes/prestamos/:formato` | Bibliotecario/Administrador |
+| `GET` | `/api/reportes/movimientos/:formato` | Administrador |
 
 ## Despliegue
 
@@ -321,7 +349,7 @@ Los módulos se comunican mediante repositorios y servicios, no importando SQL d
 
 - Sustituir almacenamiento local por Supabase Storage sin modificar controladores.
 - Probar reglas con repositorios falsos y API mediante dependencias inyectadas.
-- Añadir reportes, notificaciones o reservas como módulos independientes.
+- Añadir notificaciones, reservas o analítica avanzada como módulos independientes.
 - Separar procesos programados cuando el volumen lo requiera.
 - Escalar horizontalmente la API porque el estado operativo reside en PostgreSQL/Storage.
 

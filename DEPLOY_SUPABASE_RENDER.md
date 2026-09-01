@@ -135,7 +135,9 @@ curl https://<api-render>/api/health
 ```
 
 Luego verifique catálogo público, login de administrador, registro de libro con
-portada, solicitud pública, préstamo directo, devolución y movimientos.
+portada, solicitud pública, préstamo directo, devolución y movimientos. Desde
+el panel descargue además un PDF de Préstamos, un Excel de Inventario y confirme
+que Movimientos ofrece ambos formatos únicamente al Administrador.
 
 Compruebe también directamente rutas internas del frontend, por ejemplo:
 

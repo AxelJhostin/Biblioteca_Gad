@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 async function loginAsAdmin(page) {
   await page.goto('/personal/login');
   await page.getByLabel('Usuario').fill(process.env.E2E_ADMIN_USER || 'admin');
-  await page.getByLabel('Contraseña').fill(process.env.E2E_ADMIN_PASSWORD || 'Admin#Cambiar2026');
+  await page.getByLabel('Contraseña', { exact: true }).fill(process.env.E2E_ADMIN_PASSWORD || 'Admin#Cambiar2026');
   await page.getByRole('button', { name: 'Ingresar' }).click();
   await expect(page).toHaveURL(/\/panel$/);
   await expect(page.getByRole('heading', { name: 'Inicio' })).toBeVisible();

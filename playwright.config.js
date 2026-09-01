@@ -10,7 +10,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   outputDir: 'test-results',
   use: {
-    baseURL: externalBaseUrl || 'http://127.0.0.1:5173',
+    baseURL: externalBaseUrl || 'http://localhost:5173',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
@@ -19,14 +19,14 @@ export default defineConfig({
   },
   webServer: externalBaseUrl ? undefined : [
     {
-      command: 'npm run dev -w server',
-      url: 'http://127.0.0.1:4000/api/health',
+      command: 'npm start -w server',
+      url: 'http://localhost:4000/api/health',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
     },
     {
-      command: 'npm run dev -w client -- --host 127.0.0.1',
-      url: 'http://127.0.0.1:5173',
+      command: 'npm run build -w client && npm run preview -w client -- --host 127.0.0.1 --port 5173',
+      url: 'http://localhost:5173',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,
     },

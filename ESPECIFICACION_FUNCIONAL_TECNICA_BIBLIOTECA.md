@@ -1,8 +1,10 @@
 # Especificación funcional y técnica — Sistema de Gestión de Biblioteca Municipal
 
-**Versión:** 1.0  
-**Fecha:** 31 de agosto de 2026  
-**Estado:** Base aprobable para iniciar el desarrollo  
+**Versión:** 1.1
+
+**Fecha:** 1 de septiembre de 2026
+
+**Estado:** Implementado y validado localmente
 **Documento fuente:** `Requerimientos_Biblioteca_Municipal.md`
 
 ---
@@ -25,6 +27,7 @@ El sistema conservará la línea visual y la arquitectura de referencia de **Reh
 - Bloqueo de nuevas solicitudes de un cliente que tenga material sin devolver vencido o activo.
 - Gestión administrativa de libros, autores, archivos digitales y cuentas de bibliotecarios.
 - Historial de movimientos de préstamos, devoluciones, ingresos, ediciones y rechazos.
+- Exportación institucional de inventario, préstamos y movimientos en PDF y Excel.
 - Diseño responsive basado en el panel de referencia.
 
 ### 2.2 Fuera de alcance
@@ -33,7 +36,7 @@ El sistema conservará la línea visual y la arquitectura de referencia de **Reh
 - Reservas de ejemplares no disponibles.
 - Multas, sanciones, cobros o pagos por atraso.
 - Integración con correo, WhatsApp, SMS, lectores de códigos de barras o servicios externos.
-- Reportes estadísticos avanzados o exportación a PDF/Excel. El historial operativo sí forma parte de esta versión.
+- Analítica avanzada, tableros históricos, gráficos ejecutivos o reportes distintos de inventario, préstamos y movimientos.
 - Gestión de varias sucursales, ubicaciones físicas, ejemplares individualizados o inventario por estantería.
 - Reservas o lista de espera de libros no disponibles. La prioridad por orden de llegada de una solicitud es una preasignación interna del flujo de préstamo, no un módulo de reservas.
 
@@ -69,9 +72,11 @@ Principios de negocio:
 | Aprobar, rechazar, entregar o devolver | — | Sí | Sí |
 | Registrar préstamo directo presencial | — | Sí | Sí |
 | Consultar préstamos activos y atrasados | — | Sí | Sí |
+| Exportar inventario y préstamos en PDF/Excel | — | Sí | Sí |
 | Crear o editar libros y autores | — | — | Sí |
 | Cargar o reemplazar archivo digital | — | — | Sí |
 | Consultar movimientos completos | — | — | Sí |
+| Exportar movimientos en PDF/Excel | — | — | Sí |
 | Crear, editar, activar o desactivar cuentas | — | — | Sí |
 
 Notas:
@@ -142,6 +147,16 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 - No se aplican multas ni sanciones.
 - Mientras el cliente tenga uno o más préstamos `activo` o `atrasado`, la API rechaza nuevas solicitudes. Las solicitudes pendientes previas pueden seguir siendo revisadas, pero no deben aprobarse si en ese momento ya existe un préstamo abierto.
 
+### 5.7 Exportación de reportes
+
+1. En Catálogo y Préstamos, el bibliotecario o administrador selecciona PDF o Excel; en Movimientos la acción aparece únicamente al administrador.
+2. El reporte respeta el texto, estado o tipo filtrado en el módulo desde el que se genera.
+3. La API vuelve a consultar los datos con SQL parametrizado y autorización del servidor; el navegador no construye ni altera el contenido institucional.
+4. PDF y Excel incluyen logotipo municipal, nombre de la institución, título, fecha/hora local de emisión, responsable autenticado, criterio aplicado y total de registros.
+5. Los PDF usan página A4 horizontal, encabezado repetible, tabla legible y numeración. Los Excel incluyen encabezado municipal, filtros, filas inmovilizadas, anchos definidos y configuración de impresión horizontal.
+6. Si el resultado supera 5.000 registros, la API responde `413 REPORT_TOO_LARGE` y solicita aplicar un filtro. No se entrega un reporte truncado silenciosamente.
+7. La descarga usa `Cache-Control: private, no-store` y nunca contiene contraseñas ni secretos de infraestructura.
+
 ## 6. Reglas de negocio verificables
 
 | ID | Regla |
@@ -161,6 +176,7 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 | RN-13 | La lectura digital es pública cuando el libro está marcado como digital y tiene un archivo activo; el archivo no se ofrece como descarga. |
 | RN-14 | Aprobar préstamo, rechazar solicitud, registrar devolución, ingresar libro y editar libro generan obligatoriamente un Movimiento con actor, fecha/hora, referencias y detalle opcional. |
 | RN-15 | En una solicitud pública, la cédula contiene exactamente 10 dígitos; el nombre no admite números; y el teléfono, cuando se proporciona, debe ser un celular ecuatoriano `09` de 10 dígitos o un fijo nacional de 9 dígitos. |
+| RN-16 | Inventario y préstamos pueden exportarse por ambos roles internos; Movimientos solo por Administrador. Los documentos respetan filtros, registran responsable y no modifican datos. |
 
 ## 7. Modelo de información
 
@@ -228,14 +244,14 @@ El estado `aprobado` mencionado en el levantamiento queda registrado mediante `f
 |---|:---:|:---:|---|
 | Inicio | Sí | Sí | Indicadores operativos: solicitudes pendientes, préstamos activos y atrasados. No sustituye reportes. |
 | Solicitudes | Sí | Sí | Filtrar, ver detalle, aprobar y entregar o rechazar. |
-| Préstamos | Sí | Sí | Buscar, consultar vencimientos y registrar devoluciones parciales o totales. |
+| Préstamos | Sí | Sí | Buscar, consultar vencimientos, registrar devoluciones y exportar PDF/Excel. |
 | Préstamo directo | Sí | Sí | Registrar datos del cliente, seleccionar materiales disponibles y entregar en una operación. |
-| Catálogo | Consulta | Gestión total | Existencias, ficha, alta, edición y estado de libros. |
+| Catálogo | Consulta | Gestión total | Existencias, ficha, alta, edición, estado y exportación de inventario. |
 | Autores | Consulta | Gestión total | Crear, editar y asociar autores. |
 | Digitales | Consulta de estado | Gestión total | Cargar, reemplazar, activar o desactivar archivo digital. |
 | Clientes | Consulta | Consulta | Historial de préstamos por identificación. No hay edición manual independiente en V1. |
 | Personal | — | Gestión total | Crear, editar, activar/desactivar bibliotecarios y administrar cuentas. |
-| Movimientos | — | Completa | Historial filtrable por fecha, tipo, libro, préstamo y actor. |
+| Movimientos | — | Completa | Historial filtrable y exportación PDF/Excel exclusiva del Administrador. |
 | Perfil / salir | Sí | Sí | Datos básicos y cierre de sesión. |
 
 ### 8.3 Sistema visual de referencia
@@ -259,6 +275,7 @@ Navegador
                  ├─ autenticación JWT y control de rol
                  ├─ reglas de préstamo y Movimientos
                  ├─ visor/stream seguro de documentos
+                 ├─ generador institucional de reportes
                  └─ PostgreSQL (Supabase)
 ```
 
@@ -275,7 +292,7 @@ Navegador
 - Node.js 20 y Express con módulos ECMAScript.
 - PostgreSQL por `pg`; Supabase se usa como proveedor administrado de PostgreSQL, no se accede directamente desde el navegador.
 - JWT de vida limitada para personal autenticado, contraseñas con `bcryptjs` y middleware de permisos.
-- Multer para recepción de archivos y PDFKit/ExcelJS disponibles si se aprueban documentos o exportaciones en una fase posterior.
+- Multer para recepción de archivos, PDFKit para reportes PDF y write-excel-file para libros de trabajo XLSX.
 - API REST versionable bajo `/api`.
 
 ### 9.3 Almacenamiento y despliegue
@@ -309,6 +326,9 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 | `GET/POST/PATCH` | `/api/admin/autores[/:id]` | Admin | Gestionar autores. |
 | `GET/POST/PATCH` | `/api/admin/personal[/:id]` | Admin | Gestionar cuentas del personal. |
 | `GET` | `/api/movimientos` | Admin | Consultar historial de movimientos filtrado. |
+| `GET` | `/api/reportes/inventario/:formato` | Bibliotecario/Admin | Descargar inventario filtrado; `formato` es `pdf` o `xlsx`. |
+| `GET` | `/api/reportes/prestamos/:formato` | Bibliotecario/Admin | Descargar préstamos filtrados; `formato` es `pdf` o `xlsx`. |
+| `GET` | `/api/reportes/movimientos/:formato` | Admin | Descargar movimientos filtrados; `formato` es `pdf` o `xlsx`. |
 
 ### 10.1 Errores esperados
 
@@ -319,6 +339,7 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 | `403` | Rol insuficiente o cuenta inactiva. |
 | `404` | Recurso inexistente o archivo no disponible. |
 | `409` | Conflicto de negocio: stock insuficiente, préstamo ya procesado, código o identificación duplicada. |
+| `413` | El reporte supera 5.000 registros y requiere un filtro más específico. |
 | `422` | Datos válidos en forma pero incumplen una regla de negocio. |
 | `500` | Error no controlado; no expone detalles internos. |
 
@@ -348,7 +369,7 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 | Accesibilidad | Etiquetas de formulario, foco visible, contraste suficiente, navegación básica por teclado y mensajes de error asociados al campo. |
 | Disponibilidad | La aplicación informa de forma clara errores de conexión o mantenimiento, sin perder datos de formularios en curso cuando sea posible. |
 | Mantenibilidad | Separar componentes, páginas, rutas, reglas de negocio y migraciones; no duplicar reglas entre cliente y servidor. |
-| Pruebas | Pruebas unitarias de cálculos/reglas y pruebas de API para permisos, stock, vencimiento y devoluciones. |
+| Pruebas | Pruebas unitarias, integración HTTP y E2E con navegador para móvil, autenticación y descargas PDF/Excel. |
 
 ## 13. Datos iniciales y migración
 
@@ -369,7 +390,7 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 | 2. Solicitudes | Carrito de préstamo, cliente sin cuenta, registro atómico por orden de llegada y bandeja de personal. | La primera solicitud válida aparta stock; una posterior sin disponibilidad queda rechazada automáticamente. |
 | 3. Circulación | Aprobación/entrega, vencimientos, bloqueo y devoluciones parciales/totales. | Stock no se sobreasigna y se libera correctamente al devolver. |
 | 4. Administración | CRUD de catálogo/autores, personal, archivos digitales, restablecimiento de contraseña y Movimientos. | Solo administrador modifica recursos administrativos y queda historial funcional. |
-| 5. Lectura y cierre | Visor digital, endurecimiento de seguridad, pruebas, datos iniciales y despliegue. | Lectura integrada, pruebas críticas aprobadas y ambiente productivo operativo. |
+| 5. Lectura y cierre | Visor digital, reportes PDF/Excel, endurecimiento de seguridad, pruebas, datos iniciales y despliegue. | Lectura y exportaciones integradas, pruebas críticas aprobadas y ambiente listo para publicar. |
 
 ## 15. Criterios de aceptación del MVP
 
@@ -385,6 +406,8 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 10. Un archivo digital activo se lee desde el visor sin que la aplicación ofrezca descarga directa.
 11. Préstamos, devoluciones, ingresos/ediciones de libros y rechazos aparecen en Movimientos con actor, fecha/hora, referencias y detalle opcional.
 12. La interfaz funciona en escritorio y móvil, conserva la identidad visual acordada y no muestra módulos clínicos de la aplicación de referencia.
+13. Personal autenticado descarga inventario y préstamos en PDF/Excel; solo el Administrador descarga Movimientos. Los archivos muestran identidad municipal, responsable, filtros y total.
+14. Los recorridos críticos de catálogo/solicitud móvil, login y descargas se ejecutan mediante pruebas E2E repetibles.
 
 ## 16. Decisiones pendientes antes de producción
 
@@ -397,7 +420,7 @@ Estas decisiones no bloquean la construcción de la base, pero deben confirmarse
 | Almacenamiento | Supabase Storage privado servido por API; respaldos de base de datos gestionados por el proveedor en la nube. | Confirmar cuenta/proyecto y política vigente del proveedor. |
 | Contacto | Teléfono ecuatoriano y/o correo obligatorio. El teléfono, si se ingresa, es celular `09` de 10 dígitos o fijo nacional de 9 dígitos. | Confirmado para V1. |
 | Identificación | Cédula ecuatoriana única de exactamente 10 dígitos numéricos. | Confirmado para V1. |
-| Reportes | Solo Movimientos y panel operativo en V1. | Definir indicadores y exportaciones para una fase posterior. |
+| Reportes | Inventario, préstamos y movimientos se exportan en PDF/Excel institucional. | Definir únicamente si se requieren indicadores o reportes adicionales. |
 | Notificaciones | No hay notificaciones externas en V1. | Confirmar necesidad de correo, WhatsApp o recordatorios. |
 
 ---

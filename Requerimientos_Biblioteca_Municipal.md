@@ -132,6 +132,7 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 6. Verificar disponibilidad de libros específicos.
 7. Consultar qué clientes tienen libros físicos prestados actualmente, y quiénes están atrasados.
 8. Registrar un préstamo directamente cuando el cliente se presenta en la biblioteca, ingresando cédula, nombre, contacto, materiales, cantidades y fecha límite. La entrega queda activa en una sola operación.
+9. Exportar el inventario y los préstamos en PDF o Excel, respetando el filtro aplicado en cada módulo.
 
 ### 3.3 Administrador (con autenticación)
 
@@ -141,6 +142,7 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 4. Revisar historial de movimientos: préstamos, devoluciones, ingresos, ediciones de libros y rechazos de solicitudes.
 5. Gestionar cuentas de bibliotecarios (crear, editar, activar/desactivar).
 6. Restablecer o cambiar la contraseña de una cuenta de Bibliotecario. Los bibliotecarios no disponen de recuperación ni autogestión de contraseña.
+7. Exportar inventario, préstamos y el historial de movimientos en PDF o Excel, respetando los permisos y filtros de cada módulo.
 
 ---
 
@@ -157,11 +159,15 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 - Al crear solicitudes concurrentes por el último ejemplar disponible, la primera solicitud válida en orden de fecha y hora aparta la unidad. Las solicitudes posteriores sin disponibilidad se rechazan automáticamente; no se crea una reserva o lista de espera.
 - Rechazar una solicitud únicamente cambia su estado a `rechazado` y registra el movimiento correspondiente. No genera notificaciones ni otras acciones hacia el cliente.
 - No se requiere un mecanismo de respaldo adicional dentro de la aplicación: la base de datos en la nube gestiona sus propios respaldos.
+- Los reportes son documentos de consulta: no modifican datos y solo pueden generarse desde una sesión de personal activa.
+- Los archivos PDF y Excel deben incluir identidad municipal, título, fecha y hora de emisión, responsable autenticado, filtros aplicados y total de registros.
+- El bibliotecario puede exportar inventario y préstamos. La exportación de Movimientos es exclusiva del Administrador.
+- Para evitar consumos excesivos de memoria, una exportación admite hasta 5.000 registros; si el resultado es mayor, el sistema solicita aplicar un filtro antes de generar el archivo.
 
 ---
 
 ## 5. Puntos a confirmar más adelante (fuera de esta versión)
 
 - Sistema de reservas para libros físicos no disponibles.
-- Reportes o estadísticas específicas que necesite el Administrador (más allá del historial de movimientos).
+- Indicadores estadísticos avanzados, gráficos ejecutivos o reportes adicionales distintos de inventario, préstamos y movimientos.
 - Formato de archivo digital permitido, si la biblioteca desea aceptar alternativas al PDF. No se define límite de tamaño de PDF en esta versión.

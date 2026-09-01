@@ -8,7 +8,7 @@ function addTextFilter(params, where, value, sql) {
 
 export function createReportsRepository(db) {
   return {
-    async inventory(filters = {}) {
+    async inventario(filters = {}) {
       const params = [];
       const where = ['l.activo = true'];
       addTextFilter(params, where, filters.search, `(
@@ -58,7 +58,7 @@ export function createReportsRepository(db) {
       return rows;
     },
 
-    async loans(filters = {}) {
+    async prestamos(filters = {}) {
       const params = [];
       const where = ['1=1'];
       if (filters.estado) {
@@ -94,7 +94,7 @@ export function createReportsRepository(db) {
       return rows;
     },
 
-    async movements(filters = {}) {
+    async movimientos(filters = {}) {
       const params = [];
       const where = ['1=1'];
       if (filters.tipo) {

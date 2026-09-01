@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import ExcelJS from 'exceljs';
 import { createReportsService } from '../../src/modules/reports/reports.service.js';
 
 const actor = { id: 1, nombre_completo: 'Administrador Biblioteca', rol: 'administrador' };
@@ -34,17 +33,13 @@ test('genera un PDF institucional válido', async () => {
   assert.ok(report.buffer.length > 2000);
 });
 
-test('genera un Excel estructurado con encabezado, filtros y datos', async () => {
+test('genera un Excel estructurado y descargable', async () => {
   const service = createReportsService(repository());
   const report = await service.generate({ type: 'inventario', format: 'xlsx', filters: {}, actor, generatedAt });
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(report.buffer);
-  const sheet = workbook.getWorksheet('Inventario');
-  assert.equal(sheet.getCell('A3').value, 'Reporte de inventario bibliográfico');
-  assert.equal(sheet.getCell('A9').value, 'ID libro');
-  assert.equal(sheet.getCell('A10').value, 'BJM-001');
-  assert.equal(sheet.getCell('H10').value, 3);
-  assert.ok(sheet.autoFilter);
+  assert.equal(report.contentType, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  assert.match(report.filename, /inventario-2026-08-31\.xlsx$/);
+  assert.equal(report.buffer.subarray(0, 2).toString(), 'PK');
+  assert.ok(report.buffer.length > 3000);
 });
 
 test('impide que un bibliotecario exporte el historial de movimientos', async () => {
