@@ -26,6 +26,8 @@ Los requisitos que gobiernan el desarrollo están en [Requerimientos_Biblioteca_
 
 El despliegue completo en Supabase, Render y Vercel está documentado en [DEPLOY_SUPABASE_RENDER.md](./DEPLOY_SUPABASE_RENDER.md). La sustitución del Supabase anterior permanece preparada pero aplazada; ningún dato remoto fue modificado.
 
+La situación de cierre, el procedimiento de relevo y la lista de entrega institucional están en [ENTREGA_FINAL_PASANTIA.md](./ENTREGA_FINAL_PASANTIA.md). La ampliación pendiente para cuentas de clientes está definida por separado en [PLAN_CUENTAS_CLIENTES.md](./PLAN_CUENTAS_CLIENTES.md); todavía no forma parte del código ni de la base de datos.
+
 ## Arquitectura
 
 ```text
