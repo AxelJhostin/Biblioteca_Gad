@@ -12,6 +12,7 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1).default('postgresql://postgres:postgres@127.0.0.1:5432/biblioteca_municipal'),
   DB_SSL: booleanString(false),
   DB_SSL_REJECT_UNAUTHORIZED: booleanString(true),
+  DB_SSL_CA: z.string().optional().default(''),
   DB_POOL_MAX: z.coerce.number().int().positive().max(50).default(10),
   JWT_SECRET: z.string().min(24).default('desarrollo-biblioteca-cambiar-antes-produccion'),
   JWT_TTL: z.coerce.number().int().positive().default(3600),

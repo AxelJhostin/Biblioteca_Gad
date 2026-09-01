@@ -34,7 +34,7 @@ export default function StaffLayout() {
   return (
     <div className="app-wrapper">
       <aside className="sidebar">
-        <div className="sidebar-brand">
+        <div className="sidebar-brand" data-easter-trigger>
           <span className="brand-badge"><img src="/assets/logo.jpg" alt="Logo" /></span>
           <span className="brand-text">Biblioteca Municipal<small>JIPIJAPA</small></span>
         </div>
@@ -67,4 +67,3 @@ export default function StaffLayout() {
     </div>
   );
 }
-

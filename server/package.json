@@ -9,6 +9,8 @@
     "start": "node src/index.js",
     "db:migrate": "node src/scripts/migrate.js",
     "db:seed": "node src/scripts/seed.js",
+    "db:replace:check": "node src/scripts/replace-rehabilitation.js",
+    "db:replace:rehabilitacion": "node src/scripts/replace-rehabilitation.js --execute",
     "test": "node --test --test-concurrency=1 test/unit/*.test.js test/integration/*.test.js",
     "test:coverage": "node --test --experimental-test-coverage --test-concurrency=1 test/unit/*.test.js test/integration/*.test.js"
   },

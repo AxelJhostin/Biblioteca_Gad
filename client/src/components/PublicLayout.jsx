@@ -7,7 +7,7 @@ export default function PublicLayout() {
     <div className="public-shell">
       <header className="public-header">
         <div className="container d-flex align-items-center justify-content-between gap-3 py-3">
-          <Link to="/" className="public-brand">
+          <Link to="/" className="public-brand" data-easter-trigger>
             <img src="/assets/logo.jpg" alt="Municipio de Jipijapa" />
             <span><strong>Biblioteca Municipal</strong><small>Jipijapa · Patrimonio y conocimiento</small></span>
           </Link>
@@ -31,4 +31,3 @@ export default function PublicLayout() {
     </div>
   );
 }
-

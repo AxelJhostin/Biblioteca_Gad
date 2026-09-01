@@ -2,8 +2,9 @@ services:
   - type: web
     name: biblioteca-municipal-jipijapa-api
     runtime: node
+    plan: free
     rootDir: .
-    buildCommand: npm ci && npm run db:migrate
+    buildCommand: npm ci && npm run db:migrate && npm run db:seed
     startCommand: npm run start
     healthCheckPath: /api/health
     envVars:
@@ -15,6 +16,10 @@ services:
         value: "true"
       - key: DB_SSL_REJECT_UNAUTHORIZED
         value: "true"
+      - key: DB_POOL_MAX
+        value: "5"
+      - key: JWT_TTL
+        value: "3600"
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
@@ -25,4 +30,13 @@ services:
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
-
+      - key: SUPABASE_COVERS_BUCKET
+        value: biblioteca-portadas
+      - key: SUPABASE_DIGITAL_BUCKET
+        value: biblioteca-digitales
+      - key: ADMIN_NAME
+        value: Administrador Biblioteca
+      - key: ADMIN_USER
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false

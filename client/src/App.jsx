@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Protected } from './state/AuthContext.jsx';
 import PublicLayout from './components/PublicLayout.jsx';
 import StaffLayout from './components/StaffLayout.jsx';
+import EasterEgg from './components/EasterEgg.jsx';
 
 const Catalog = lazy(() => import('./pages/public/Catalog.jsx'));
 const BookDetail = lazy(() => import('./pages/public/BookDetail.jsx'));
@@ -19,6 +20,8 @@ const Movements = lazy(() => import('./pages/staff/Movements.jsx'));
 
 export default function App() {
   return (
+    <>
+    <EasterEgg />
     <Suspense fallback={<div className="page-loader"><span className="spinner-border text-success" /></div>}>
     <Routes>
       <Route element={<PublicLayout />}>
@@ -40,5 +43,6 @@ export default function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </Suspense>
+    </>
   );
 }

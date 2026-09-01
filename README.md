@@ -23,6 +23,8 @@ La base funcional incluye:
 
 Los requisitos que gobiernan el desarrollo están en [Requerimientos_Biblioteca_Municipal.md](./Requerimientos_Biblioteca_Municipal.md) y [ESPECIFICACION_FUNCIONAL_TECNICA_BIBLIOTECA.md](./ESPECIFICACION_FUNCIONAL_TECNICA_BIBLIOTECA.md).
 
+El despliegue completo en Supabase, Render y Vercel está documentado en [DEPLOY_SUPABASE_RENDER.md](./DEPLOY_SUPABASE_RENDER.md). La sustitución del Supabase anterior permanece preparada pero aplazada; ningún dato remoto fue modificado.
+
 ## Arquitectura
 
 ```text
@@ -203,6 +205,8 @@ npm run dev
 | `npm run qa` | Ejecuta pruebas y compilación de producción. |
 | `npm run db:migrate` | Aplica migraciones pendientes. |
 | `npm run db:seed` | Crea o actualiza las cuentas locales configuradas. |
+| `npm run db:replace:check` | Audita sin cambios si la base corresponde a Rehabilitación GAD. |
+| `npm run db:replace:rehabilitacion` | Sustitución remota protegida por lista blanca y confirmación explícita. |
 
 ## Pruebas y estrategia de QA
 
@@ -292,16 +296,24 @@ El archivo `render.yaml` instala dependencias, aplica migraciones y arranca la A
 - `CLIENT_URL`: URL del frontend, sin ruta final.
 - `SUPABASE_URL` y `SUPABASE_SECRET_KEY`.
 - `JWT_SECRET`: valor largo y aleatorio.
+- `ADMIN_PASSWORD`: contraseña inicial segura para la cuenta administradora.
+
+El servicio está definido con el plan gratuito. En ese plan Render puede suspenderlo tras un periodo sin tráfico, por lo que la primera petición posterior puede tardar mientras vuelve a iniciar. Las migraciones se mantienen en el comando de construcción porque los comandos previos al despliegue requieren un servicio de pago.
 
 ### Frontend en Vercel
 
-Importe el repositorio con `client` como Root Directory y configure:
+Importe el repositorio manteniendo la raíz (`.`) como Root Directory. El archivo
+`vercel.json` usa el lockfile del monorepo, compila únicamente `client` y publica
+`client/dist`. Configure en Vercel:
 
 ```env
 VITE_API_URL=https://<api-render>
 ```
 
-El archivo `client/vercel.json` permite abrir rutas internas directamente.
+El archivo `vercel.json` permite abrir rutas internas directamente sin errores
+404 y aplica cabeceras básicas de seguridad. Cuando Vercel entregue el dominio
+definitivo, configúrelo también como `CLIENT_URL` en Render y vuelva a desplegar
+la API.
 
 ## Escalabilidad
 

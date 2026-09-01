@@ -2,10 +2,14 @@ import pg from 'pg';
 import { env } from '../config/env.js';
 
 export function createDatabase(config = {}) {
+  const ssl = env.DB_SSL ? {
+    rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED,
+    ...(env.DB_SSL_CA ? { ca: env.DB_SSL_CA.replace(/\\n/g, '\n') } : {}),
+  } : undefined;
   const pool = config.pool || new pg.Pool({
     connectionString: config.connectionString || env.DATABASE_URL,
     max: env.DB_POOL_MAX,
-    ssl: env.DB_SSL ? { rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED } : undefined,
+    ssl,
   });
 
   return {
@@ -31,4 +35,3 @@ export function createDatabase(config = {}) {
     },
   };
 }
-

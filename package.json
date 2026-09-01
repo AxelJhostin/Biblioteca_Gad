@@ -19,6 +19,8 @@
     "start": "npm run start -w server",
     "db:migrate": "npm run db:migrate -w server",
     "db:seed": "npm run db:seed -w server",
+    "db:replace:check": "npm run db:replace:check -w server",
+    "db:replace:rehabilitacion": "npm run db:replace:rehabilitacion -w server",
     "qa": "npm run test && npm run build"
   },
   "devDependencies": {
