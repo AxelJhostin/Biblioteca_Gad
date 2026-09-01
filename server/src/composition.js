@@ -11,6 +11,8 @@ import { createAdminRepository } from './modules/admin/admin.repository.js';
 import { createAdminService } from './modules/admin/admin.service.js';
 import { createMovementsRepository } from './modules/movements/movements.repository.js';
 import { createDashboardRepository } from './modules/dashboard/dashboard.repository.js';
+import { createReportsRepository } from './modules/reports/reports.repository.js';
+import { createReportsService } from './modules/reports/reports.service.js';
 
 export function createDependencies(overrides = {}) {
   const db = overrides.db || createDatabase();
@@ -25,6 +27,7 @@ export function createDependencies(overrides = {}) {
   });
   const loansRepository = overrides.loansRepository || createLoansRepository(db);
   const adminRepository = overrides.adminRepository || createAdminRepository(db);
+  const reportsRepository = overrides.reportsRepository || createReportsRepository(db);
 
   return {
     db,
@@ -41,8 +44,8 @@ export function createDependencies(overrides = {}) {
     }),
     movementsRepository: overrides.movementsRepository || createMovementsRepository(db),
     dashboardRepository: overrides.dashboardRepository || createDashboardRepository(db),
+    reportsService: overrides.reportsService || createReportsService(reportsRepository),
     coversBucket: env.SUPABASE_COVERS_BUCKET,
     digitalBucket: env.SUPABASE_DIGITAL_BUCKET,
   };
 }
-

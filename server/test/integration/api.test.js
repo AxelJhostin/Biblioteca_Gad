@@ -32,6 +32,14 @@ function dependencies() {
     adminService: { listStaff: async () => [], createBook: async () => ({}), updateBook: async () => ({}), uploadCover: async () => ({}), uploadDigital: async () => ({}), createStaff: async () => ({}), updateStaff: async () => ({}), resetPassword: async () => ({}) },
     movementsRepository: { list: async () => [] },
     dashboardRepository: { get: async () => ({ metrics: {}, attention: [] }) },
+    reportsService: {
+      generate: async ({ type, format }) => ({
+        buffer: Buffer.from(format === 'pdf' ? '%PDF-reporte' : 'xlsx-reporte'),
+        contentType: format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        filename: `biblioteca-jipijapa-${type}-2026-08-31.${format}`,
+        count: 2,
+      }),
+    },
   };
 }
 
@@ -61,4 +69,16 @@ test('permite al personal registrar un préstamo directo', async () => {
   const response = await request(app).post('/api/prestamos/directo').set('Authorization', 'Bearer staff').send({}).expect(201);
   assert.equal(response.body.item.estado, 'activo');
   assert.equal(response.body.item.codigo, 'SOL-DIRECTO');
+});
+
+test('protege y entrega reportes institucionales como archivos adjuntos', async () => {
+  const app = createApp({ dependencies: dependencies() });
+  await request(app).get('/api/reportes/prestamos/pdf').expect(401);
+  const response = await request(app)
+    .get('/api/reportes/prestamos/pdf')
+    .set('Authorization', 'Bearer staff')
+    .expect(200)
+    .expect('Content-Type', 'application/pdf')
+    .expect('X-Report-Records', '2');
+  assert.match(response.headers['content-disposition'], /biblioteca-jipijapa-prestamos-2026-08-31\.pdf/);
 });

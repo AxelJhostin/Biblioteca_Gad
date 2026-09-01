@@ -10,6 +10,7 @@ import { createPublicLoanRoutes, createStaffLoanRoutes } from './modules/loans/l
 import { createAdminRoutes } from './modules/admin/admin.routes.js';
 import { createMovementsRoutes } from './modules/movements/movements.routes.js';
 import { createDashboardRoutes } from './modules/dashboard/dashboard.routes.js';
+import { createReportsRoutes } from './modules/reports/reports.routes.js';
 
 export function createApp(overrides = {}) {
   const dependencies = overrides.dependencies || createDependencies(overrides);
@@ -19,7 +20,11 @@ export function createApp(overrides = {}) {
   app.disable('x-powered-by');
   if (env.NODE_ENV === 'production') app.set('trust proxy', 1);
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-  app.use(cors({ origin: env.NODE_ENV === 'test' ? true : allowedOrigins, credentials: false }));
+  app.use(cors({
+    origin: env.NODE_ENV === 'test' ? true : allowedOrigins,
+    credentials: false,
+    exposedHeaders: ['Content-Disposition', 'X-Report-Records'],
+  }));
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
@@ -46,6 +51,10 @@ export function createApp(overrides = {}) {
   }));
   app.use('/api/dashboard', createDashboardRoutes({
     repository: dependencies.dashboardRepository,
+    authenticate: dependencies.authenticate,
+  }));
+  app.use('/api/reportes', createReportsRoutes({
+    service: dependencies.reportsService,
     authenticate: dependencies.authenticate,
   }));
 

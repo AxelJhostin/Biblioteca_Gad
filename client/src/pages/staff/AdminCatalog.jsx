@@ -3,6 +3,7 @@ import Swal from 'sweetalert2';
 import api, { apiFileUrl } from '../../api.js';
 import { useAuth } from '../../state/AuthContext.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
+import ReportActions from '../../components/ReportActions.jsx';
 
 const empty = { id_libro_texto: '', tipo_material: 'libro', tipo_material_otro: '', genero: 'narrativa', genero_otro: '', titulo: '', descripcion: '', anio_publicacion: '', cantidad_total: 1, autores_texto: '', activo: true };
 
@@ -47,7 +48,7 @@ export default function AdminCatalog() {
       ...book.autores.map((author) => author.nombre_completo)]
       .some((value) => String(value || '').toLocaleLowerCase('es').includes(term));
   });
-  return <><PageHeader icon="fa-book" title="Catálogo" subtitle={user?.rol === 'administrador' ? 'Gestiona obras, existencias y archivos digitales' : 'Consulta portadas, identificadores y disponibilidad'} actions={user?.rol === 'administrador' && <button className="btn btn-primary" onClick={create}><i className="fas fa-plus me-2" />Nuevo libro</button>} />
+  return <><PageHeader icon="fa-book" title="Catálogo" subtitle={user?.rol === 'administrador' ? 'Gestiona obras, existencias y archivos digitales' : 'Consulta portadas, identificadores y disponibilidad'} actions={<div className="d-flex flex-wrap align-items-center gap-2"><ReportActions type="inventario" filters={search ? { search } : {}} />{user?.rol === 'administrador' && <button className="btn btn-primary" onClick={create}><i className="fas fa-plus me-2" />Nuevo libro</button>}</div>} />
     {showForm && <form className="card mb-4" onSubmit={submit}><div className="card-header d-flex justify-content-between"><span>{selected ? 'Editar libro' : 'Registrar libro'}</span><button className="btn-close" type="button" onClick={() => setShowForm(false)} /></div><div className="card-body"><div className="row g-3">
       <div className="col-md-4"><label className="form-label">ID Libro</label><input className="form-control" required value={form.id_libro_texto} onChange={(e) => setForm({ ...form, id_libro_texto: e.target.value })} /></div><div className="col-md-8"><label className="form-label">Título</label><input className="form-control" required value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} /></div>
       <div className="col-md-6"><label className="form-label">Autores separados por coma</label><input className="form-control" required value={form.autores_texto} onChange={(e) => setForm({ ...form, autores_texto: e.target.value })} /></div><div className="col-md-3"><label className="form-label">Tipo</label><select className="form-select" value={form.tipo_material} onChange={(e) => setForm({ ...form, tipo_material: e.target.value })}><option value="libro">Libro</option><option value="revista">Revista</option><option value="folleto">Folleto</option><option value="tesis">Tesis</option><option value="otro">Otro</option></select></div><div className="col-md-3"><label className="form-label">Género</label><select className="form-select" value={form.genero} onChange={(e) => setForm({ ...form, genero: e.target.value })}><option value="narrativa">Narrativa</option><option value="lirico">Lírico</option><option value="poesia">Poesía</option><option value="ensayo">Ensayo</option><option value="otro">Otro</option></select></div>
