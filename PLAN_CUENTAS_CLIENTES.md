@@ -1,9 +1,9 @@
 # Plan de incorporación de cuentas para clientes
 
 **Proyecto:** Sistema de Biblioteca Municipal de Jipijapa  
-**Estado:** Especificación aprobada para implementación posterior  
+**Estado:** Implementado y validado en Supabase local
 **Fecha de definición:** 1 de septiembre de 2026  
-**Alcance de este documento:** documentación únicamente; no implica cambios actuales en código, base de datos ni Supabase.
+**Alcance de este documento:** diseño implementado en código y Supabase local; el despliegue remoto continúa pendiente de autorización.
 
 ## 1. Resumen de la decisión
 

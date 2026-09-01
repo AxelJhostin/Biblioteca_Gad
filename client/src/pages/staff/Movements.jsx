@@ -4,7 +4,7 @@ import PageHeader from '../../components/PageHeader.jsx';
 import { formatDateTime } from '../../lib/format.js';
 import ReportActions from '../../components/ReportActions.jsx';
 
-const labels = { prestamo: 'Préstamo', devolucion: 'Devolución', ingreso_libro: 'Ingreso de libro', edicion_libro: 'Edición de libro', rechazo_solicitud: 'Rechazo de solicitud' };
+const labels = { prestamo: 'Préstamo', devolucion: 'Devolución', ingreso_libro: 'Ingreso de libro', edicion_libro: 'Edición de libro', rechazo_solicitud: 'Rechazo de solicitud', gestion_cuenta: 'Gestión de cuenta' };
 export default function Movements() {
   const [items, setItems] = useState([]);
   const [filters, setFilters] = useState({ tipo: '', search: '' });

@@ -40,6 +40,8 @@ ADMIN_USER=admin
 ADMIN_PASSWORD=<contraseña-inicial-segura>
 ```
 
+No configure `CLIENT_DEMO_IDENTIFICATION`, `CLIENT_DEMO_PASSWORD` ni `LIBRARIAN_PASSWORD` en producción; corresponden exclusivamente a los datos sintéticos de Docker local.
+
 Para un backend persistente de Render en una red IPv4 se usa el **Shared Pooler
 en modo sesión**, puerto `5432`. Obtenga siempre la cadena actual desde
 **Supabase Dashboard → Connect**.
@@ -134,8 +136,8 @@ contrario es normal que el navegador bloquee esas peticiones por CORS.
 curl https://<api-render>/api/health
 ```
 
-Luego verifique catálogo público, login de administrador, registro de libro con
-portada, solicitud pública, préstamo directo, devolución y movimientos. Desde
+Luego verifique catálogo público, registro/login de Cliente, solicitud autenticada,
+historial propio, login de administrador, registro de libro con portada, préstamo directo, devolución y movimientos. Desde
 el panel descargue además un PDF de Préstamos, un Excel de Inventario y confirme
 que Movimientos ofrece ambos formatos únicamente al Administrador.
 
@@ -144,6 +146,8 @@ Compruebe también directamente rutas internas del frontend, por ejemplo:
 ```text
 https://<frontend-vercel>/personal/login
 https://<frontend-vercel>/solicitud
+https://<frontend-vercel>/cuenta/login
+https://<frontend-vercel>/mi-cuenta
 https://<frontend-vercel>/panel
 ```
 

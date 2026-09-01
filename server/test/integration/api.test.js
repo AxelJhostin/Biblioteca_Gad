@@ -12,10 +12,29 @@ function dependencies() {
     }
     next(new AppError('No autenticado', 401, 'UNAUTHENTICATED'));
   };
+  const authenticateClient = (req, _res, next) => {
+    if (req.headers.authorization === 'Bearer client') {
+      req.client = { id: 2, cliente_id: 8, nombre_completo: 'Ana Lectora', rol: 'cliente' };
+      req.clientAccount = { id: 2, cliente_id: 8, debe_cambiar_password: false };
+      return next();
+    }
+    next(new AppError('No autenticado', 401, 'CLIENT_UNAUTHENTICATED'));
+  };
   return {
     db: { close: async () => {} },
     authService: { login: async () => ({ token: 'staff', user: { id: 1, rol: 'administrador' } }) },
     authenticate,
+    authenticateClient,
+    clientAuthService: {
+      register: async () => ({ token: 'client', user: { id: 2, cliente_id: 8, rol: 'cliente' } }),
+      activate: async () => ({ token: 'client', user: { id: 2, cliente_id: 8, rol: 'cliente' } }),
+      login: async () => ({ token: 'client', user: { id: 2, cliente_id: 8, rol: 'cliente' } }),
+      changePassword: async () => ({ token: 'client-next', user: { id: 2, cliente_id: 8, rol: 'cliente' } }),
+      getProfile: (account) => account,
+      listLoans: async () => [{ id: 5, codigo: 'SOL-UNO' }],
+      getLoan: async () => ({ id: 5, codigo: 'SOL-UNO' }),
+      updateProfile: async () => ({}), listClients: async () => [], staffActivate: async () => ({}), staffReset: async () => ({}),
+    },
     storage: { download: async () => Buffer.from('file') },
     coversBucket: 'covers', digitalBucket: 'digital',
     catalogRepository: {
@@ -24,8 +43,8 @@ function dependencies() {
       getCover: async () => null, getDigital: async () => null,
     },
     loansService: {
-      createRequest: async () => ({ rejected: false, loan: { codigo: 'SOL-UNO', estado: 'pendiente' } }),
-      getPublicStatus: async () => ({ codigo: 'SOL-UNO', estado: 'pendiente' }),
+      createClientRequest: async () => ({ rejected: false, loan: { codigo: 'SOL-UNO', estado: 'pendiente' } }),
+      getClientStatus: async () => ({ codigo: 'SOL-UNO', estado: 'pendiente' }),
       list: async () => [], approveAndDeliver: async () => ({}), reject: async () => ({}), registerReturn: async () => ({}),
       createDirectLoan: async () => ({ id: 5, codigo: 'SOL-DIRECTO', estado: 'activo' }),
     },
@@ -51,10 +70,18 @@ test('expone salud y catálogo público por HTTP', async () => {
   assert.equal(catalog.body.items[0].titulo, 'Jipijapa en la memoria');
 });
 
-test('registra una solicitud pública y devuelve su código', async () => {
+test('exige cuenta cliente y registra una solicitud autenticada', async () => {
   const app = createApp({ dependencies: dependencies() });
-  const response = await request(app).post('/api/solicitudes').send({}).expect(201);
+  await request(app).post('/api/solicitudes').send({}).expect(401);
+  const response = await request(app).post('/api/solicitudes').set('Authorization', 'Bearer client').send({}).expect(201);
   assert.equal(response.body.solicitud.codigo, 'SOL-UNO');
+});
+
+test('protege y entrega únicamente la actividad de la cuenta cliente', async () => {
+  const app = createApp({ dependencies: dependencies() });
+  await request(app).get('/api/clientes/me/prestamos').expect(401);
+  const response = await request(app).get('/api/clientes/me/prestamos').set('Authorization', 'Bearer client').expect(200);
+  assert.equal(response.body.items[0].codigo, 'SOL-UNO');
 });
 
 test('protege los módulos internos y permite una sesión válida', async () => {

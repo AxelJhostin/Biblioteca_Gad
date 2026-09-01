@@ -7,6 +7,7 @@ const baseMenu = [
   ['fa-inbox', 'Solicitudes', '/panel/solicitudes'],
   ['fa-right-left', 'Préstamos', '/panel/prestamos'],
   ['fa-book', 'Catálogo', '/panel/catalogo'],
+  ['fa-address-card', 'Clientes', '/panel/clientes'],
 ];
 const adminMenu = [
   ['fa-users-gear', 'Personal', '/panel/personal'],

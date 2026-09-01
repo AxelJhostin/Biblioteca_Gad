@@ -2,8 +2,7 @@ import { z } from 'zod';
 import { ConflictError, NotFoundError, ValidationError } from '../../core/errors.js';
 import { cleanText, normalizeDocument } from '../../core/validation.js';
 
-const requestSchema = z.object({
-  cliente: z.object({
+const clientSchema = z.object({
     identificacion: z.string().transform(normalizeDocument).pipe(z.string()
       .regex(/^\d{10}$/, 'La cédula debe contener exactamente 10 dígitos numéricos.')),
     nombre_completo: z.string().transform(cleanText).pipe(z.string()
@@ -19,17 +18,22 @@ const requestSchema = z.object({
     correo: z.string().optional().default('').transform((value) => cleanText(value).toLowerCase()).pipe(
       z.union([z.literal(''), z.email('Ingresa un correo electrónico válido.')]),
     ),
-  }),
+  });
+
+const itemsSchema = z.object({
   items: z.array(z.object({
     libro_id: z.coerce.number().int().positive(),
     cantidad: z.coerce.number().int().positive().max(100),
   })).min(1, 'Añade al menos un libro antes de enviar la solicitud.').max(20, 'Una solicitud admite hasta 20 libros.'),
 }).superRefine((value, ctx) => {
-  if (!cleanText(value.cliente.telefono) && !cleanText(value.cliente.correo)) {
-    ctx.addIssue({ code: 'custom', path: ['cliente', 'telefono'], message: 'Ingresa un teléfono o un correo para poder gestionar la solicitud.' });
-  }
   if (new Set(value.items.map((item) => item.libro_id)).size !== value.items.length) {
     ctx.addIssue({ code: 'custom', path: ['items'], message: 'Cada libro debe aparecer una sola vez.' });
+  }
+});
+
+const requestSchema = z.object({ cliente: clientSchema }).and(itemsSchema).superRefine((value, ctx) => {
+  if (!cleanText(value.cliente.telefono) && !cleanText(value.cliente.correo)) {
+    ctx.addIssue({ code: 'custom', path: ['cliente', 'telefono'], message: 'Ingresa un teléfono o un correo para poder gestionar la solicitud.' });
   }
 });
 
@@ -52,12 +56,13 @@ function validateDueDate(dueDate) {
 
 export function createLoansService(repository) {
   return {
-    async createRequest(payload) {
-      const input = requestSchema.parse(payload);
+    async createClientRequest(payload, authenticatedClient) {
+      const input = itemsSchema.parse(payload);
       input.items.sort((a, b) => a.libro_id - b.libro_id);
 
       return repository.transaction(async (tx) => {
-        const client = await repository.upsertClient(tx, input.cliente);
+        const client = await repository.findClientById(tx, authenticatedClient?.cliente_id);
+        if (!client) throw new NotFoundError('Cliente no encontrado.');
         if (await repository.hasOpenLoan(tx, client.id)) {
           throw new ConflictError('El cliente tiene un préstamo activo o atrasado pendiente de devolución.', 'CLIENT_BLOCKED');
         }
@@ -131,8 +136,8 @@ export function createLoansService(repository) {
       });
     },
     list: (filters) => repository.list(filters),
-    getPublicStatus: async (code, identification) => {
-      const loan = await repository.getPublicStatus(cleanText(code), normalizeDocument(identification));
+    getClientStatus: async (code, clientId) => {
+      const loan = await repository.getClientStatus(cleanText(code), clientId);
       if (!loan) throw new NotFoundError('No se encontró una solicitud con esos datos.');
       return loan;
     },

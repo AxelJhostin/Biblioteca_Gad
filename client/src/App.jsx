@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Protected } from './state/AuthContext.jsx';
+import { ClientProtected } from './state/ClientAuthContext.jsx';
 import PublicLayout from './components/PublicLayout.jsx';
 import StaffLayout from './components/StaffLayout.jsx';
 import EasterEgg from './components/EasterEgg.jsx';
@@ -17,6 +18,15 @@ const Loans = lazy(() => import('./pages/staff/Loans.jsx'));
 const AdminCatalog = lazy(() => import('./pages/staff/AdminCatalog.jsx'));
 const StaffAccounts = lazy(() => import('./pages/staff/StaffAccounts.jsx'));
 const Movements = lazy(() => import('./pages/staff/Movements.jsx'));
+const StaffClients = lazy(() => import('./pages/staff/StaffClients.jsx'));
+const ClientLogin = lazy(() => import('./pages/client/ClientLogin.jsx'));
+const Register = lazy(() => import('./pages/client/Register.jsx'));
+const Activate = lazy(() => import('./pages/client/Activate.jsx'));
+const AccountDashboard = lazy(() => import('./pages/client/AccountDashboard.jsx'));
+const LoanHistory = lazy(() => import('./pages/client/LoanHistory.jsx'));
+const LoanDetail = lazy(() => import('./pages/client/LoanDetail.jsx'));
+const Profile = lazy(() => import('./pages/client/Profile.jsx'));
+const Security = lazy(() => import('./pages/client/Security.jsx'));
 
 export default function App() {
   return (
@@ -30,6 +40,14 @@ export default function App() {
         <Route path="/libros/:id/leer" element={<Reader />} />
         <Route path="/solicitud" element={<RequestLoan />} />
         <Route path="/solicitud/confirmacion/:codigo" element={<RequestConfirmation />} />
+        <Route path="/cuenta/login" element={<ClientLogin />} />
+        <Route path="/cuenta/registro" element={<Register />} />
+        <Route path="/cuenta/activar" element={<Activate />} />
+        <Route path="/mi-cuenta" element={<ClientProtected><AccountDashboard /></ClientProtected>} />
+        <Route path="/mi-cuenta/prestamos" element={<ClientProtected><LoanHistory /></ClientProtected>} />
+        <Route path="/mi-cuenta/prestamos/:id" element={<ClientProtected><LoanDetail /></ClientProtected>} />
+        <Route path="/mi-cuenta/perfil" element={<ClientProtected><Profile /></ClientProtected>} />
+        <Route path="/mi-cuenta/seguridad" element={<ClientProtected allowPasswordChange><Security /></ClientProtected>} />
       </Route>
       <Route path="/personal/login" element={<Login />} />
       <Route element={<Protected><StaffLayout /></Protected>}>
@@ -37,6 +55,7 @@ export default function App() {
         <Route path="/panel/solicitudes" element={<Requests />} />
         <Route path="/panel/prestamos" element={<Loans />} />
         <Route path="/panel/catalogo" element={<AdminCatalog />} />
+        <Route path="/panel/clientes" element={<StaffClients />} />
         <Route path="/panel/personal" element={<Protected roles={['administrador']}><StaffAccounts /></Protected>} />
         <Route path="/panel/movimientos" element={<Protected roles={['administrador']}><Movements /></Protected>} />
       </Route>

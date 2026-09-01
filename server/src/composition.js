@@ -13,6 +13,9 @@ import { createMovementsRepository } from './modules/movements/movements.reposit
 import { createDashboardRepository } from './modules/dashboard/dashboard.repository.js';
 import { createReportsRepository } from './modules/reports/reports.repository.js';
 import { createReportsService } from './modules/reports/reports.service.js';
+import { createClientAuthRepository } from './modules/client-auth/client-auth.repository.js';
+import { createClientAuthService } from './modules/client-auth/client-auth.service.js';
+import { createClientAuthMiddleware } from './modules/client-auth/client-auth.middleware.js';
 
 export function createDependencies(overrides = {}) {
   const db = overrides.db || createDatabase();
@@ -28,11 +31,17 @@ export function createDependencies(overrides = {}) {
   const loansRepository = overrides.loansRepository || createLoansRepository(db);
   const adminRepository = overrides.adminRepository || createAdminRepository(db);
   const reportsRepository = overrides.reportsRepository || createReportsRepository(db);
+  const clientAuthRepository = overrides.clientAuthRepository || createClientAuthRepository(db);
+  const clientAuthService = overrides.clientAuthService || createClientAuthService({
+    repository: clientAuthRepository, jwtSecret: env.JWT_SECRET, jwtTtl: env.JWT_TTL,
+  });
 
   return {
     db,
     authService,
     authenticate: overrides.authenticate || createAuthMiddleware(authService),
+    clientAuthService,
+    authenticateClient: overrides.authenticateClient || createClientAuthMiddleware(clientAuthService),
     storage,
     catalogRepository: overrides.catalogRepository || createCatalogRepository(db),
     loansService: overrides.loansService || createLoansService(loansRepository),

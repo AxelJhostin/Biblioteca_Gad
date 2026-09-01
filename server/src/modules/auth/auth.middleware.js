@@ -6,9 +6,9 @@ export function createAuthMiddleware(authService) {
       const header = req.headers.authorization || '';
       const token = header.startsWith('Bearer ') ? header.slice(7) : '';
       const payload = token && authService.verify(token);
-      if (!payload) throw new AppError('Sesión no válida o expirada.', 401, 'UNAUTHENTICATED');
+      if (!payload || payload.type !== 'personal') throw new AppError('Sesión no válida o expirada.', 401, 'UNAUTHENTICATED');
       const user = await authService.getUser(payload.sub);
-      if (!user) throw new AppError('La cuenta está inactiva o ya no existe.', 401, 'ACCOUNT_INACTIVE');
+      if (!user || payload.role !== user.rol) throw new AppError('La cuenta está inactiva o ya no existe.', 401, 'ACCOUNT_INACTIVE');
       req.user = user;
       next();
     } catch (error) {
@@ -25,4 +25,3 @@ export function requireRole(...roles) {
     next();
   };
 }
-

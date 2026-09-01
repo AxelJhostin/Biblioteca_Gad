@@ -1,13 +1,14 @@
 # Sistema de Gestión — Biblioteca Municipal
-## Documento de Análisis de Requerimientos (versión revisada)
+## Documento de Análisis de Requerimientos (versión 2.0)
 
 ---
 
 ## 1. Alcance y decisiones generales
 
-- No se requiere autenticación para el rol Cliente/Usuario. Cualquier persona puede consultar el catálogo y visualizar libros digitales sin registrarse.
+- El catálogo, las fichas y la lectura digital son públicos. Únicamente la solicitud de préstamos físicos exige una cuenta Cliente autenticada.
 - Sí se requiere autenticación (login) para los roles Bibliotecario y Administrador.
-- Para solicitar un préstamo físico, el sistema solicita nombre completo, cédula ecuatoriana y contacto en el momento de la solicitud, sin necesidad de crear una cuenta.
+- El Cliente puede registrarse por sí mismo con cédula ecuatoriana y contraseña. Los datos de identidad se reutilizan desde su perfil al solicitar.
+- Bibliotecarios y Administradores pueden activar cuentas para clientes existentes y restablecer contraseñas temporales; el Cliente deberá cambiarlas en su siguiente acceso.
 - Los libros digitales son de acceso libre y sin restricciones, mediante un visor embebido dentro del sistema. No se permite la descarga directa del archivo.
 - El plazo de devolución de cada préstamo se define caso por caso por el bibliotecario al momento de aprobarlo (no es un valor fijo del sistema).
 - No existen sanciones ni multas por atraso. Si un cliente tiene un préstamo vencido sin devolver, el sistema únicamente bloquea nuevos préstamos para esa persona hasta que devuelva lo pendiente.
@@ -49,7 +50,7 @@ Se maneja como entidad independiente (no como texto libre dentro de Libro), porq
 
 ### 2.3 Usuario / Cliente
 
-Datos que se solicitan al momento de pedir un préstamo físico. No implica creación de cuenta ni login.
+Identidad bibliotecaria propietaria de las solicitudes y préstamos. Puede existir sin cuenta cuando corresponde a historial anterior o préstamos presenciales.
 
 | Campo | Descripción |
 |---|---|
@@ -57,7 +58,20 @@ Datos que se solicitan al momento de pedir un préstamo físico. No implica crea
 | Nombre completo | Nombre del solicitante compuesto por letras. Admite espacios, apóstrofes, puntos y guiones, pero no números. |
 | Contacto | Teléfono ecuatoriano y/o correo electrónico. El teléfono admite celular nacional de 10 dígitos iniciado en `09` o fijo nacional de 9 dígitos con código de provincia. |
 
-### 2.4 Cuenta de personal (Bibliotecario / Administrador)
+### 2.4 Cuenta de cliente
+
+Credenciales separadas de la identidad bibliotecaria y de las cuentas del personal. Existe como máximo una por Cliente.
+
+| Campo | Descripción |
+|---|---|
+| ID Cuenta | Identificador interno. |
+| Cliente | Relación única con Usuario/Cliente. |
+| Contraseña | Se conserva exclusivamente como hash bcrypt. |
+| Estado | Activa o inactiva. |
+| Cambio obligatorio | Indica si debe sustituir una contraseña temporal. |
+| Seguridad de sesión | Intentos fallidos, bloqueo temporal, versión de sesión y último acceso. |
+
+### 2.5 Cuenta de personal (Bibliotecario / Administrador)
 
 | Campo | Descripción |
 |---|---|
@@ -67,7 +81,7 @@ Datos que se solicitan al momento de pedir un préstamo físico. No implica crea
 | Rol | Bibliotecario o Administrador. |
 | Estado | Activo / inactivo (gestionado por el Administrador). |
 
-### 2.5 Préstamo
+### 2.6 Préstamo
 
 Reemplaza al bloque original "Información de libro prestado": aquellas preguntas (¿fue prestado?, ¿está disponible?, ¿tiene pendientes?) no son datos que se almacenan, sino consultas que se responden a partir de esta entidad.
 
@@ -82,7 +96,7 @@ Reemplaza al bloque original "Información de libro prestado": aquellas pregunta
 | Fecha real de devolución | Se registra al devolver; nula si sigue prestado. |
 | Estado | Pendiente / aprobado / rechazado / activo / devuelto / atrasado. |
 
-### 2.6 Detalle de Préstamo
+### 2.7 Detalle de Préstamo
 
 Un préstamo puede incluir varios libros distintos y varias unidades de cada uno, por lo que se separa en una tabla de detalle:
 
@@ -94,14 +108,14 @@ Un préstamo puede incluir varios libros distintos y varias unidades de cada uno
 | Cantidad | Número de ejemplares de ese libro incluidos en el préstamo. |
 | Cantidad devuelta | Número de ejemplares ya devueltos de la línea; permite devoluciones parciales. |
 
-### 2.7 Movimiento
+### 2.8 Movimiento
 
 Registra el historial funcional que el Administrador consulta como movimientos del sistema.
 
 | Campo | Descripción |
 |---|---|
 | ID Movimiento | Identificador interno del movimiento. |
-| Tipo de movimiento | Préstamo, devolución, ingreso de libro, edición de libro o rechazo de solicitud. |
+| Tipo de movimiento | Préstamo, devolución, ingreso de libro, edición de libro, rechazo de solicitud o gestión de cuenta. |
 | Fecha y hora | Momento exacto en que se produjo la acción. |
 | Usuario/cuenta que lo generó | Cliente, bibliotecario o administrador, según corresponda. |
 | Libro relacionado | Referencia opcional al libro afectado. |
@@ -114,13 +128,17 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 
 ## 3. Funciones por rol
 
-### 3.1 Cliente (sin autenticación)
+### 3.1 Visitante y Cliente
 
 1. Ver y navegar el catálogo completo, buscar por título, autor, género o tipo de material, y consultar el detalle de cada libro.
 2. Ver disponibilidad física (cantidad disponible) de un libro.
 3. Ver si el libro tiene versión digital disponible.
 4. Visualizar el libro digital mediante visor embebido (sin descarga), con zoom, navegación y vista opcional de una o dos páginas. La portada se presenta sola y las páginas interiores pueden mostrarse como un libro abierto.
-5. Solicitar préstamo de uno o varios libros físicos, ingresando sus datos de contacto en ese momento.
+5. Preparar una selección de uno o varios libros físicos sin iniciar sesión.
+6. Registrarse, activar una cuenta con historial previo e iniciar sesión con cédula y contraseña.
+7. Enviar la solicitud física utilizando obligatoriamente la identidad de su sesión.
+8. Consultar exclusivamente sus propias solicitudes, préstamos, fechas y devoluciones.
+9. Actualizar teléfono/correo y cambiar su propia contraseña.
 
 ### 3.2 Bibliotecario (con autenticación)
 
@@ -133,6 +151,7 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 7. Consultar qué clientes tienen libros físicos prestados actualmente, y quiénes están atrasados.
 8. Registrar un préstamo directamente cuando el cliente se presenta en la biblioteca, ingresando cédula, nombre, contacto, materiales, cantidades y fecha límite. La entrega queda activa en una sola operación.
 9. Exportar el inventario y los préstamos en PDF o Excel, respetando el filtro aplicado en cada módulo.
+10. Buscar clientes, activar sus cuentas y restablecer contraseñas temporales.
 
 ### 3.3 Administrador (con autenticación)
 
@@ -143,12 +162,18 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 5. Gestionar cuentas de bibliotecarios (crear, editar, activar/desactivar).
 6. Restablecer o cambiar la contraseña de una cuenta de Bibliotecario. Los bibliotecarios no disponen de recuperación ni autogestión de contraseña.
 7. Exportar inventario, préstamos y el historial de movimientos en PDF o Excel, respetando los permisos y filtros de cada módulo.
+8. Buscar clientes, activar sus cuentas y restablecer contraseñas temporales.
 
 ---
 
 ## 4. Reglas de negocio
 
 - El sistema debe contabilizar cuántos libros tiene actualmente prestados cada cliente.
+- Una solicitud física solo puede enviarse desde una cuenta Cliente activa y utiliza el `cliente_id` de la sesión; nunca acepta una cédula editable como propietario.
+- Un Cliente únicamente puede consultar préstamos asociados a su propio `cliente_id`.
+- Cambiar o restablecer una contraseña incrementa la versión de sesión e invalida tokens anteriores.
+- Una contraseña temporal debe cambiarse antes de solicitar materiales o consultar actividad.
+- Los clientes con historial previo se vinculan al registro existente mediante comprobación segura o asistencia del personal; no se duplican.
 - No se puede aprobar un préstamo si la cantidad solicitada de un libro supera la cantidad disponible.
 - Un préstamo puede incluir más de un ejemplar de un mismo libro.
 - Un préstamo puede incluir varios libros distintos a la vez.

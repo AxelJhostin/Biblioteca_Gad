@@ -3,6 +3,13 @@ export function createLoansRepository(db) {
 
   return {
     transaction: (callback) => db.transaction(callback),
+    async findClientById(tx, id) {
+      const { rows } = await executor(tx).query(
+        'select id, identificacion, nombre_completo, telefono, correo from public.clientes where id = $1',
+        [id],
+      );
+      return rows[0] || null;
+    },
     async upsertClient(tx, client) {
       const { rows } = await executor(tx).query(
         `insert into public.clientes (identificacion, nombre_completo, telefono, correo)
@@ -129,17 +136,16 @@ export function createLoansRepository(db) {
       );
       return rows;
     },
-    async getPublicStatus(code, identification) {
+    async getClientStatus(code, clientId) {
       const { rows } = await db.query(
         `select p.codigo, p.estado, p.fecha_solicitud, p.fecha_entrega, p.fecha_limite, p.fecha_devolucion,
                 coalesce(json_agg(json_build_object('titulo', l.titulo, 'cantidad', d.cantidad_solicitada) order by d.id), '[]') as items
            from public.prestamos p
-           join public.clientes c on c.id = p.cliente_id
            join public.prestamo_detalles d on d.prestamo_id = p.id
            join public.libros l on l.id = d.libro_id
-          where upper(p.codigo) = upper($1) and upper(c.identificacion) = upper($2)
+          where upper(p.codigo) = upper($1) and p.cliente_id = $2
           group by p.id`,
-        [code, identification],
+        [code, clientId],
       );
       return rows[0] || null;
     },

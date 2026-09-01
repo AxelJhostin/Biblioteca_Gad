@@ -23,7 +23,7 @@ Al momento de esta entrega:
 - La aplicación funciona en escritorio y dispositivos móviles.
 - Supabase local se ejecuta mediante Docker y contiene datos de demostración reproducibles.
 - El despliegue para Supabase, Render y Vercel está preparado, pero no se modificó ningún proyecto remoto.
-- La solicitud de última hora para incorporar cuentas de clientes está completamente especificada en `PLAN_CUENTAS_CLIENTES.md`, pero todavía no fue implementada en código ni base de datos.
+- La solicitud de última hora para incorporar cuentas de clientes está implementada y validada en Supabase local; el despliegue remoto continúa pendiente.
 
 ## 2. Funcionalidad entregada
 
@@ -39,6 +39,8 @@ Al momento de esta entrega:
 - Vista de una o dos páginas, transición tipo hoja y navegación por teclado o gestos.
 - Desplazamiento interno vertical y horizontal dentro del documento.
 - Adaptación automática a una página en pantallas móviles.
+- Registro, activación e inicio de sesión de clientes con cédula.
+- Mi cuenta con historial propio, perfil, seguridad y solicitud física autenticada.
 
 ### Bibliotecario
 
@@ -49,6 +51,7 @@ Al momento de esta entrega:
 - Registro de devoluciones parciales y completas.
 - Consulta detallada del catálogo, portadas y disponibilidad.
 - Gestión de libros, ejemplares y archivos digitales conforme a permisos.
+- Activación y restablecimiento de contraseñas temporales de clientes.
 
 ### Administrador
 
@@ -132,14 +135,14 @@ npm run qa:full
 
 La última ejecución integral registrada terminó correctamente con:
 
-- 20 pruebas del servidor, entre unitarias e integración HTTP.
+- 27 pruebas del servidor, entre unitarias e integración HTTP.
 - 14 pruebas del cliente y sus componentes.
-- 3 escenarios E2E en navegador.
+- 5 escenarios E2E en navegador.
 - Compilación de producción del cliente y servidor.
 
 Los escenarios E2E comprueban, entre otros puntos:
 
-- Validaciones y solicitud pública desde un viewport móvil.
+- Cuenta Cliente, validaciones, conservación de selección y solicitud autenticada desde un viewport móvil.
 - Visor digital: zoom, una o dos páginas, adaptación móvil y desplazamiento interno del PDF.
 - Acceso administrativo y exportación de reportes PDF/XLSX.
 
@@ -163,9 +166,9 @@ Si solo se modificó documentación, no es necesario repetir toda la batería, p
 | `PLAN_CUENTAS_CLIENTES.md` | Ampliación pendiente para registro e inicio de sesión de clientes |
 | `ENTREGA_FINAL_PASANTIA.md` | Estado de entrega, relevo, riesgos y pasos siguientes |
 
-## 7. Ampliación pendiente: cuentas de clientes
+## 7. Ampliación implementada: cuentas de clientes
 
-La nueva solicitud municipal se encuentra diseñada, pero deliberadamente no fue incorporada al código durante esta entrega. Su fuente de verdad es `PLAN_CUENTAS_CLIENTES.md`.
+La nueva solicitud municipal fue incorporada al código y a una migración reproducible de Supabase. Su diseño y criterios de aceptación se conservan en `PLAN_CUENTAS_CLIENTES.md`.
 
 Los acuerdos principales son:
 
@@ -257,24 +260,23 @@ La base en la nube administrará sus respaldos; no se diseñó un mecanismo adic
 - [ ] Probar reportes PDF y Excel con datos reales de ensayo.
 - [ ] Cambiar todas las contraseñas temporales antes de uso real.
 
-### Solicitud de cuentas de clientes
+### Cuentas de clientes
 
-- [ ] Obtener aprobación formal de `PLAN_CUENTAS_CLIENTES.md`.
-- [ ] Implementar primero en Supabase local.
-- [ ] Ejecutar pruebas unitarias, integración y E2E del nuevo flujo.
-- [ ] Actualizar requerimientos, especificación y README al terminar.
+- [x] Implementar la migración en Supabase local.
+- [x] Incorporar registro, login, actividad propia y solicitud autenticada.
+- [x] Incorporar activación/restablecimiento por personal.
+- [ ] Ejecutar la aceptación final en el entorno remoto autorizado.
 
 ## 12. Próximos pasos recomendados
 
 1. Entregar y validar esta documentación con el responsable de la biblioteca.
 2. Definir las cuentas institucionales de infraestructura y la política de custodia de credenciales.
-3. Implementar localmente la ampliación de cuentas de clientes siguiendo su plan técnico.
-4. Ejecutar `npm run qa:full` y corregir cualquier regresión.
-5. Desplegar en un proyecto Supabase autorizado, Render y Vercel.
-6. Realizar una aceptación final con usuarios reales de cada rol.
+3. Ejecutar `npm run qa:full` antes de cada entrega y corregir cualquier regresión.
+4. Desplegar en un proyecto Supabase autorizado, Render y Vercel.
+5. Realizar una aceptación final con usuarios reales de cada rol, incluyendo el Cliente autenticado.
 
 ## 13. Estado de cierre
 
-El código actual queda listo para demostrar y operar localmente dentro del alcance implementado. El proyecto remoto anterior permanece intacto. La ampliación de cuentas de clientes queda documentada con suficiente detalle para continuarla sin improvisar el modelo de datos, la seguridad o el flujo de los usuarios.
+El código actual queda listo para demostrar y operar localmente dentro del alcance implementado. El proyecto remoto anterior permanece intacto. La ampliación de cuentas de clientes está implementada, probada y documentada; resta únicamente su despliegue y aceptación en infraestructura autorizada.
 
 Esta separación permite presentar una versión estable hoy y desarrollar el cambio de última hora de forma controlada, verificable y sin poner en riesgo la información existente.

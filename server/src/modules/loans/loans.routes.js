@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { asyncHandler } from '../../core/http.js';
+import { requireChangedPassword } from '../client-auth/client-auth.middleware.js';
 
-export function createPublicLoanRoutes({ service }) {
+export function createPublicLoanRoutes({ service, authenticateClient }) {
   const router = Router();
   const limiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false });
 
-  router.post('/', limiter, asyncHandler(async (req, res) => {
-    const result = await service.createRequest(req.body);
+  router.post('/', limiter, authenticateClient, requireChangedPassword, asyncHandler(async (req, res) => {
+    const result = await service.createClientRequest(req.body, req.client);
     res.status(result.rejected ? 409 : 201).json({
       ok: !result.rejected,
       code: result.rejected ? 'OUT_OF_STOCK' : undefined,
@@ -18,8 +19,8 @@ export function createPublicLoanRoutes({ service }) {
     });
   }));
 
-  router.get('/:codigo/consulta', asyncHandler(async (req, res) => {
-    const item = await service.getPublicStatus(req.params.codigo, req.query.identificacion);
+  router.get('/:codigo/consulta', authenticateClient, requireChangedPassword, asyncHandler(async (req, res) => {
+    const item = await service.getClientStatus(req.params.codigo, req.client.cliente_id);
     res.json({ ok: true, item });
   }));
   return router;

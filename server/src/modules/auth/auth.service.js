@@ -21,7 +21,7 @@ export function createAuthService({ repository, jwtSecret, jwtTtl }) {
         usuario: account.usuario,
         rol: account.rol,
       };
-      const token = jwt.sign({ sub: String(account.id), role: account.rol }, jwtSecret, { expiresIn: jwtTtl });
+      const token = jwt.sign({ sub: String(account.id), role: account.rol, type: 'personal' }, jwtSecret, { expiresIn: jwtTtl });
       return { token, user };
     },
     verify(token) {
@@ -36,4 +36,3 @@ export function createAuthService({ repository, jwtSecret, jwtTtl }) {
     },
   };
 }
-

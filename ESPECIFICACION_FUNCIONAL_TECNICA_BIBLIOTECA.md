@@ -1,6 +1,6 @@
 # Especificación funcional y técnica — Sistema de Gestión de Biblioteca Municipal
 
-**Versión:** 1.1
+**Versión:** 1.2
 
 **Fecha:** 1 de septiembre de 2026
 
@@ -11,7 +11,7 @@
 
 ## 1. Propósito
 
-Construir un sistema web para administrar el catálogo físico y digital de la Biblioteca Municipal, las solicitudes y préstamos físicos, las devoluciones y las cuentas del personal.
+Construir un sistema web para administrar el catálogo físico y digital de la Biblioteca Municipal, las cuentas de clientes, las solicitudes y préstamos físicos, las devoluciones y las cuentas del personal.
 
 El sistema conservará la línea visual y la arquitectura de referencia de **Rehabilitación GAD**: una aplicación React/Vite con API Express, PostgreSQL y control de acceso por roles. La identidad visible se adaptará a la Biblioteca Municipal (nombre, logotipo, textos e iconografía), sin reutilizar contenido clínico ni datos de aquel sistema.
 
@@ -21,8 +21,9 @@ El sistema conservará la línea visual y la arquitectura de referencia de **Reh
 
 - Catálogo público, búsqueda, filtros, ficha de obra, portada opcional y disponibilidad física calculada.
 - Consulta pública de material digital mediante visor integrado, sin botón ni enlace de descarga.
-- Solicitud pública de préstamo físico, sin crear una cuenta para el cliente.
-- Autenticación únicamente para bibliotecarios y administradores.
+- Registro, activación, inicio de sesión, perfil e historial propio para clientes.
+- Solicitud de préstamo físico exclusiva para una cuenta Cliente autenticada.
+- Autenticación separada para clientes y para bibliotecarios/administradores.
 - Revisión, aprobación, rechazo, entrega y devolución de préstamos.
 - Bloqueo de nuevas solicitudes de un cliente que tenga material sin devolver vencido o activo.
 - Gestión administrativa de libros, autores, archivos digitales y cuentas de bibliotecarios.
@@ -32,7 +33,7 @@ El sistema conservará la línea visual y la arquitectura de referencia de **Reh
 
 ### 2.2 Fuera de alcance
 
-- Registro, inicio de sesión o perfil para clientes.
+- Recuperación automática de contraseña por correo, SMS o WhatsApp.
 - Reservas de ejemplares no disponibles.
 - Multas, sanciones, cobros o pagos por atraso.
 - Integración con correo, WhatsApp, SMS, lectores de códigos de barras o servicios externos.
@@ -44,7 +45,8 @@ El sistema conservará la línea visual y la arquitectura de referencia de **Reh
 
 | Término | Definición |
 |---|---|
-| Cliente | Persona que consulta el catálogo o solicita un préstamo. No posee cuenta de acceso. |
+| Cliente | Persona con identidad bibliotecaria; requiere una cuenta autenticada únicamente para solicitar préstamos físicos y consultar su actividad. |
+| Visitante | Persona sin sesión que puede consultar catálogo, fichas y lectura digital, además de preparar una selección. |
 | Personal | Cuenta autenticada con rol `bibliotecario` o `administrador`. |
 | Libro | Registro bibliográfico y de existencias de una obra o material. Incluye libros, revistas, folletos, tesis u otros tipos. |
 | Ejemplar | Una unidad física disponible de un libro. En V1 se administra por cantidad, no por código individual. |
@@ -63,25 +65,24 @@ Principios de negocio:
 
 ## 4. Roles y permisos
 
-| Capacidades | Público / cliente | Bibliotecario | Administrador |
-|---|:---:|:---:|:---:|
-| Consultar catálogo, ficha y disponibilidad | Sí | Sí | Sí |
-| Usar visor digital | Sí | Sí | Sí |
-| Solicitar préstamo sin login | Sí | — | — |
-| Revisar solicitudes | — | Sí | Sí |
-| Aprobar, rechazar, entregar o devolver | — | Sí | Sí |
-| Registrar préstamo directo presencial | — | Sí | Sí |
-| Consultar préstamos activos y atrasados | — | Sí | Sí |
-| Exportar inventario y préstamos en PDF/Excel | — | Sí | Sí |
-| Crear o editar libros y autores | — | — | Sí |
-| Cargar o reemplazar archivo digital | — | — | Sí |
-| Consultar movimientos completos | — | — | Sí |
-| Exportar movimientos en PDF/Excel | — | — | Sí |
-| Crear, editar, activar o desactivar cuentas | — | — | Sí |
+| Capacidades | Visitante | Cliente autenticado | Bibliotecario | Administrador |
+|---|:---:|:---:|:---:|:---:|
+| Consultar catálogo, ficha y disponibilidad | Sí | Sí | Sí | Sí |
+| Usar visor digital | Sí | Sí | Sí | Sí |
+| Enviar solicitud física | — | Sí | — | — |
+| Consultar actividad propia | — | Sí | — | — |
+| Revisar solicitudes | — | — | Sí | Sí |
+| Aprobar, rechazar, entregar o devolver | — | — | Sí | Sí |
+| Registrar préstamo directo presencial | — | — | Sí | Sí |
+| Gestionar contraseñas de clientes | — | — | Sí | Sí |
+| Exportar inventario y préstamos en PDF/Excel | — | — | Sí | Sí |
+| Crear o editar libros y autores | — | — | — | Sí |
+| Cargar o reemplazar archivo digital | — | — | — | Sí |
+| Consultar/exportar movimientos completos | — | — | — | Sí |
 
 Notas:
 
-- No existe un rol autenticado de cliente.
+- Las sesiones de Cliente y Personal usan claves locales y tokens diferenciados por `type`; una nunca autoriza rutas de la otra.
 - Una cuenta inactiva no puede iniciar sesión ni ejecutar acciones posteriores aunque conserve un token previo; la API verifica su vigencia en operaciones protegidas.
 - El administrador hereda las capacidades del bibliotecario.
 
@@ -107,15 +108,15 @@ Notas:
 
 > Restricción conocida: ningún visor web puede impedir de forma absoluta que una persona capture contenido mostrado en su navegador. El requisito se implementa como ausencia de descarga directa, URLs no expuestas en la interfaz, autorización del endpoint de visualización y entrega optimizada para lectura; no como un mecanismo DRM.
 
-### 5.3 Solicitud pública de préstamo
+### 5.3 Registro, autenticación y solicitud de préstamo
 
-1. La persona agrega uno o varios libros físicos disponibles a una solicitud.
-2. Por cada libro indica una cantidad entera mayor a cero, hasta la disponibilidad mostrada.
-3. Completa cédula ecuatoriana de 10 dígitos, nombre completo sin números y al menos un medio de contacto (teléfono ecuatoriano o correo).
-4. La API verifica que el cliente no tenga préstamos activos o atrasados y, dentro de una transacción, comprueba las existencias que no están prestadas ni apartadas previamente.
+1. La persona puede agregar uno o varios libros físicos antes de autenticarse; la selección se conserva en el navegador.
+2. Para enviar debe registrarse o iniciar sesión con cédula y contraseña. Un cliente histórico activa su cuenta mediante contacto y código previo o con asistencia del personal.
+3. La pantalla muestra nombre, cédula y contacto de la sesión, sin permitir cambiar el propietario de la solicitud.
+4. La API obtiene `cliente_id` exclusivamente del token validado, verifica que no existan préstamos activos o atrasados y, dentro de una transacción, comprueba las existencias no comprometidas.
 5. La primera solicitud válida que llega por una cantidad disponible queda en estado `pendiente` y aparta esas unidades. El orden lo determina el registro exitoso de la transacción y su fecha/hora.
 6. Si no hay unidades suficientes, la solicitud se registra automáticamente como `rechazado`, sin apartar existencias ni crear lista de espera. La respuesta informa que el material ya no está disponible.
-7. La pantalla muestra un código de solicitud para consulta presencial. No se envía notificación externa en V1.
+7. La pantalla muestra un código y la solicitud aparece inmediatamente en **Mi cuenta**. No se envía notificación externa en V1.
 
 Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo` con actor `cliente` y el detalle “Solicitud registrada” o “Solicitud rechazada automáticamente”, según el resultado. Al aprobar y entregar se registra un segundo Movimiento de préstamo con el actor de personal correspondiente.
 
@@ -178,8 +179,10 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 | RN-12 | Solo un administrador puede modificar catálogo, archivos digitales o cuentas del personal. |
 | RN-13 | La lectura digital es pública cuando el libro está marcado como digital y tiene un archivo activo; el archivo no se ofrece como descarga. |
 | RN-14 | Aprobar préstamo, rechazar solicitud, registrar devolución, ingresar libro y editar libro generan obligatoriamente un Movimiento con actor, fecha/hora, referencias y detalle opcional. |
-| RN-15 | En una solicitud pública, la cédula contiene exactamente 10 dígitos; el nombre no admite números; y el teléfono, cuando se proporciona, debe ser un celular ecuatoriano `09` de 10 dígitos o un fijo nacional de 9 dígitos. |
+| RN-15 | Al registrar o identificar un Cliente, la cédula contiene exactamente 10 dígitos; el nombre no admite números; y el teléfono, cuando se proporciona, debe ser un celular ecuatoriano `09` de 10 dígitos o un fijo nacional de 9 dígitos. |
 | RN-16 | Inventario y préstamos pueden exportarse por ambos roles internos; Movimientos solo por Administrador. Los documentos respetan filtros, registran responsable y no modifican datos. |
+| RN-17 | La API determina el propietario de una solicitud desde la sesión Cliente, nunca desde una cédula enviada en el formulario. |
+| RN-18 | El Cliente solo consulta su actividad; cambiar o restablecer contraseña invalida tokens anteriores mediante `version_sesion`. |
 
 ## 7. Modelo de información
 
@@ -194,8 +197,9 @@ Los identificadores técnicos pueden ser enteros autogenerados. El **ID Libro** 
 | `libro_autores` | `libro_id`, `autor_id`, `orden` | Relación muchos a muchos; pareja única. |
 | `archivos_digitales` | `id`, `libro_id`, `nombre_original`, `ruta_segura`, `mime_type`, `tamano_bytes`, `estado`, fechas | En V1, un archivo activo por libro; conservar versiones inactivas para historial. |
 | `clientes` | `id`, `identificacion`, `nombre_completo`, `telefono`, `correo`, fechas | No son cuentas. La identificación es una cédula ecuatoriana única de 10 dígitos. El nombre no admite números. Teléfono ecuatoriano o correo obligatorio. |
+| `cuentas_clientes` | `id`, `cliente_id`, `password_hash`, `estado`, `debe_cambiar_password`, `intentos_fallidos`, `bloqueado_hasta`, `version_sesion`, `ultimo_acceso`, fechas | Relación uno a uno con Cliente; hash bcrypt; bloqueo temporal e invalidación de sesiones por versión. RLS activa y sin privilegios para Data API. |
 | `cuentas_personal` | `id`, `nombre_completo`, `usuario`, `password_hash`, `rol`, `estado`, último acceso, fechas | Roles fijos: `bibliotecario`, `administrador`. Nunca se guarda contraseña en texto. |
-| `prestamos` | `id`, `codigo`, `cliente_id`, `bibliotecario_id`, `fecha_solicitud`, `fecha_aprobacion`, `fecha_entrega`, `fecha_limite`, `fecha_devolucion`, `estado`, `motivo_rechazo`, fechas | `codigo` público de consulta; bibliotecario nulo hasta la revisión; una solicitud pendiente mantiene cantidades apartadas. |
+| `prestamos` | `id`, `codigo`, `cliente_id`, `bibliotecario_id`, `fecha_solicitud`, `fecha_aprobacion`, `fecha_entrega`, `fecha_limite`, `fecha_devolucion`, `estado`, `motivo_rechazo`, fechas | `codigo` visible al propietario y al personal; bibliotecario nulo hasta la revisión; una solicitud pendiente mantiene cantidades apartadas. |
 | `prestamo_detalles` | `id`, `prestamo_id`, `libro_id`, `cantidad_solicitada`, `cantidad_devuelta`, `fecha_ultima_devolucion` | Pendiente = solicitada − devuelta; no se eliminan líneas ya operadas. |
 | `movimientos` | `id`, `tipo`, `fecha_hora`, `tipo_actor`, `cliente_id`, `cuenta_personal_id`, `actor_nombre`, `libro_id`, `prestamo_id`, `detalle` | Historial funcional inmutable. Tipo: préstamo, devolución, ingreso de libro, edición de libro o rechazo de solicitud. El actor puede ser cliente, bibliotecario o administrador. |
 
@@ -205,6 +209,7 @@ Los identificadores técnicos pueden ser enteros autogenerados. El **ID Libro** 
 libros ──< libro_autores >── autores
 libros ──< archivos_digitales
 clientes ──< prestamos >── cuentas_personal
+clientes ── 0..1 cuentas_clientes
 prestamos ──< prestamo_detalles >── libros
 clientes / cuentas_personal ──< movimientos >── libros / prestamos
 ```
@@ -314,8 +319,19 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 | `GET` | `/api/catalogo` | Público | Buscar, filtrar y paginar libros con disponibilidad calculada. |
 | `GET` | `/api/catalogo/:codigo` | Público | Ficha completa de un libro. |
 | `GET` | `/api/catalogo/:codigo/visor` | Público condicionado | Entregar contenido apto para el visor si existe archivo digital activo. |
-| `POST` | `/api/solicitudes` | Público | Crear solicitud de préstamo. |
-| `GET` | `/api/solicitudes/:codigo/consulta` | Público | Consultar estado básico mediante código e identificación. |
+| `POST` | `/api/clientes/auth/registro` | Público limitado | Crear Cliente y cuenta en una transacción. |
+| `POST` | `/api/clientes/auth/activar` | Público limitado | Vincular cuenta con historial previo mediante comprobación segura. |
+| `POST` | `/api/clientes/auth/login` | Público limitado | Iniciar sesión con cédula y contraseña. |
+| `GET` | `/api/clientes/auth/me` | Cliente | Validar sesión de Cliente. |
+| `POST` | `/api/clientes/auth/cambiar-password` | Cliente | Cambiar contraseña e invalidar tokens anteriores. |
+| `GET/PATCH` | `/api/clientes/me` | Cliente | Consultar o actualizar el contacto propio. |
+| `GET` | `/api/clientes/me/prestamos[/:id]` | Cliente propietario | Consultar exclusivamente actividad propia. |
+| `POST` | `/api/clientes/me/solicitudes` | Cliente | Crear solicitud usando el `cliente_id` de la sesión. |
+| `POST` | `/api/solicitudes` | Cliente | Alias protegido para crear una solicitud autenticada. |
+| `GET` | `/api/solicitudes/:codigo/consulta` | Cliente propietario | Consultar estado del código propio. |
+| `GET` | `/api/clientes` | Bibliotecario/Admin | Buscar clientes y estado de cuenta. |
+| `POST` | `/api/clientes/:id/activar-cuenta` | Bibliotecario/Admin | Activar cuenta con contraseña temporal. |
+| `POST` | `/api/clientes/:id/restablecer-password` | Bibliotecario/Admin | Restablecer e invalidar sesiones anteriores. |
 | `POST` | `/api/auth/login` | Público | Login de personal. |
 | `GET` | `/api/auth/me` | Personal | Validar y recuperar sesión. |
 | `GET` | `/api/prestamos` | Bibliotecario/Admin | Listar préstamos activos, atrasados e historial. |
@@ -390,7 +406,7 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 |---|---|---|
 | 0. Base | Repositorio, variables de entorno, esquema, migraciones y diseño base municipal. | Aplicación inicia, conecta a BD y muestra shell responsive. |
 | 1. Catálogo | Libros, autores, portada opcional, búsqueda pública por título/autor/género/tipo, ficha y disponibilidad calculada. | Público encuentra obras, ve portada cuando existe y consulta stock real. |
-| 2. Solicitudes | Carrito de préstamo, cliente sin cuenta, registro atómico por orden de llegada y bandeja de personal. | La primera solicitud válida aparta stock; una posterior sin disponibilidad queda rechazada automáticamente. |
+| 2. Solicitudes | Selección de préstamo, cuenta Cliente, registro atómico por orden de llegada y bandeja de personal. | Solo una sesión Cliente envía la solicitud; la primera válida aparta stock y una posterior sin disponibilidad queda rechazada. |
 | 3. Circulación | Aprobación/entrega, vencimientos, bloqueo y devoluciones parciales/totales. | Stock no se sobreasigna y se libera correctamente al devolver. |
 | 4. Administración | CRUD de catálogo/autores, personal, archivos digitales, restablecimiento de contraseña y Movimientos. | Solo administrador modifica recursos administrativos y queda historial funcional. |
 | 5. Lectura y cierre | Visor digital, reportes PDF/Excel, endurecimiento de seguridad, pruebas, datos iniciales y despliegue. | Lectura y exportaciones integradas, pruebas críticas aprobadas y ambiente listo para publicar. |
@@ -399,8 +415,8 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 
 1. Una persona sin iniciar sesión puede navegar el catálogo y encontrar un libro por título, autor, género o tipo de material; ve portada cuando existe y su disponibilidad real.
 2. Un libro con varios autores los muestra y conserva todas sus asociaciones.
-3. Una persona puede solicitar varios libros y varias unidades de un mismo libro sin crear una cuenta.
-4. La solicitud falla si supera disponibilidad, carece de contacto o el cliente tiene préstamo activo/atrasado.
+3. Una persona puede preparar libros sin sesión, pero debe registrar o activar una cuenta para enviar la solicitud.
+4. La solicitud utiliza el Cliente de la sesión y falla si supera disponibilidad o el cliente tiene préstamo activo/atrasado.
 5. Un bibliotecario puede aprobar y entregar una solicitud indicando una fecha límite; las cantidades pasan a no estar disponibles.
 6. Dos operaciones concurrentes no pueden dejar disponibilidad negativa: la primera solicitud válida por el último ejemplar lo aparta y las posteriores sin stock quedan rechazadas automáticamente.
 7. Un préstamo pasa a atrasado al superar su fecha límite y el cliente queda bloqueado, sin multas.
@@ -410,7 +426,8 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 11. Préstamos, devoluciones, ingresos/ediciones de libros y rechazos aparecen en Movimientos con actor, fecha/hora, referencias y detalle opcional.
 12. La interfaz funciona en escritorio y móvil, conserva la identidad visual acordada y no muestra módulos clínicos de la aplicación de referencia.
 13. Personal autenticado descarga inventario y préstamos en PDF/Excel; solo el Administrador descarga Movimientos. Los archivos muestran identidad municipal, responsable, filtros y total.
-14. Los recorridos críticos de catálogo/solicitud móvil, login y descargas se ejecutan mediante pruebas E2E repetibles.
+14. Los recorridos críticos de catálogo/solicitud móvil, cuenta Cliente, login de personal y descargas se ejecutan mediante pruebas E2E repetibles.
+15. El Cliente consulta solo su historial, actualiza su contacto y cambia contraseña; personal puede restablecerla sin ver ni registrar el secreto.
 
 ## 16. Decisiones pendientes antes de producción
 

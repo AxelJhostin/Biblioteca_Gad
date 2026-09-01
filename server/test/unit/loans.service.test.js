@@ -9,6 +9,7 @@ function fakeRepository(options = {}) {
   return {
     movements, lockedIds,
     transaction: (callback) => callback({}),
+    findClientById: async () => ({ id: 8, identificacion: '1300000000', nombre_completo: 'Ana Lectora' }),
     upsertClient: async () => ({ id: 8, identificacion: '1300000000', nombre_completo: 'Ana Lectora' }),
     hasOpenLoan: async () => Boolean(options.blocked),
     lockBooks: async (_tx, ids) => {
@@ -29,9 +30,9 @@ const payload = {
   items: [{ libro_id: 2, cantidad: 1 }, { libro_id: 1, cantidad: 1 }],
 };
 
-test('la solicitud válida aparta unidades y bloquea los libros en orden estable', async () => {
+test('la solicitud autenticada aparta unidades y bloquea los libros en orden estable', async () => {
   const repository = fakeRepository({ totals: { 1: 1, 2: 2 } });
-  const result = await createLoansService(repository).createRequest(payload);
+  const result = await createLoansService(repository).createClientRequest({ items: payload.items }, { cliente_id: 8 });
   assert.equal(result.rejected, false);
   assert.equal(result.loan.estado, 'pendiente');
   assert.deepEqual(repository.lockedIds, [1, 2]);
@@ -41,7 +42,7 @@ test('la solicitud válida aparta unidades y bloquea los libros en orden estable
 
 test('la solicitud posterior queda rechazada cuando ya se comprometió el último ejemplar', async () => {
   const repository = fakeRepository({ totals: { 1: 1, 2: 2 }, committed: { 1: 1 } });
-  const result = await createLoansService(repository).createRequest(payload);
+  const result = await createLoansService(repository).createClientRequest({ items: payload.items }, { cliente_id: 8 });
   assert.equal(result.rejected, true);
   assert.equal(result.loan.estado, 'rechazado');
   assert.equal(repository.movements[0].tipo, 'rechazo_solicitud');
@@ -50,15 +51,15 @@ test('la solicitud posterior queda rechazada cuando ya se comprometió el últim
 test('un cliente con préstamo abierto no puede crear otra solicitud', async () => {
   const repository = fakeRepository({ blocked: true });
   await assert.rejects(
-    createLoansService(repository).createRequest(payload),
+    createLoansService(repository).createClientRequest({ items: payload.items }, { cliente_id: 8 }),
     (error) => error.code === 'CLIENT_BLOCKED' && error.status === 409,
   );
 });
 
-test('requiere al menos un medio de contacto', async () => {
+test('el préstamo directo requiere al menos un medio de contacto', async () => {
   const repository = fakeRepository();
   await assert.rejects(
-    createLoansService(repository).createRequest({ ...payload, cliente: { ...payload.cliente, telefono: '', correo: '' } }),
+    createLoansService(repository).createDirectLoan({ ...payload, cliente: { ...payload.cliente, telefono: '', correo: '' }, fecha_limite: '2099-12-31' }, { id: 4, rol: 'bibliotecario', nombre_completo: 'María' }),
     (error) => error.name === 'ZodError',
   );
 });
@@ -66,10 +67,11 @@ test('requiere al menos un medio de contacto', async () => {
 test('rechaza cédula que no tenga exactamente 10 dígitos y nombre vacío', async () => {
   const repository = fakeRepository();
   await assert.rejects(
-    createLoansService(repository).createRequest({
+    createLoansService(repository).createDirectLoan({
       ...payload,
       cliente: { ...payload.cliente, identificacion: '   ', nombre_completo: '   ' },
-    }),
+      fecha_limite: '2099-12-31',
+    }, { id: 4, rol: 'bibliotecario', nombre_completo: 'María' }),
     (error) => error.name === 'ZodError'
       && error.issues.some((issue) => issue.path.join('.') === 'cliente.identificacion')
       && error.issues.some((issue) => issue.path.join('.') === 'cliente.nombre_completo'),
@@ -79,10 +81,11 @@ test('rechaza cédula que no tenga exactamente 10 dígitos y nombre vacío', asy
 test('rechaza un teléfono con formato inválido', async () => {
   const repository = fakeRepository();
   await assert.rejects(
-    createLoansService(repository).createRequest({
+    createLoansService(repository).createDirectLoan({
       ...payload,
       cliente: { ...payload.cliente, telefono: '12-AB', correo: '' },
-    }),
+      fecha_limite: '2099-12-31',
+    }, { id: 4, rol: 'bibliotecario', nombre_completo: 'María' }),
     (error) => error.name === 'ZodError'
       && error.issues.some((issue) => issue.path.join('.') === 'cliente.telefono'),
   );
@@ -91,10 +94,11 @@ test('rechaza un teléfono con formato inválido', async () => {
 test('rechaza números en el nombre completo', async () => {
   const repository = fakeRepository();
   await assert.rejects(
-    createLoansService(repository).createRequest({
+    createLoansService(repository).createDirectLoan({
       ...payload,
       cliente: { ...payload.cliente, nombre_completo: 'Ana Lectora 2' },
-    }),
+      fecha_limite: '2099-12-31',
+    }, { id: 4, rol: 'bibliotecario', nombre_completo: 'María' }),
     (error) => error.name === 'ZodError'
       && error.issues.some((issue) => issue.path.join('.') === 'cliente.nombre_completo'),
   );

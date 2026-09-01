@@ -11,6 +11,7 @@ import { createAdminRoutes } from './modules/admin/admin.routes.js';
 import { createMovementsRoutes } from './modules/movements/movements.routes.js';
 import { createDashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { createReportsRoutes } from './modules/reports/reports.routes.js';
+import { createClientRoutes } from './modules/client-auth/client-auth.routes.js';
 
 export function createApp(overrides = {}) {
   const dependencies = overrides.dependencies || createDependencies(overrides);
@@ -36,13 +37,22 @@ export function createApp(overrides = {}) {
   }));
 
   app.use('/api/auth', createAuthRoutes(dependencies));
+  app.use('/api/clientes', createClientRoutes({
+    service: dependencies.clientAuthService,
+    loansService: dependencies.loansService,
+    authenticateClient: dependencies.authenticateClient,
+    authenticate: dependencies.authenticate,
+  }));
   app.use('/api/catalogo', createCatalogRoutes({
     repository: dependencies.catalogRepository,
     storage: dependencies.storage,
     coversBucket: dependencies.coversBucket,
     digitalBucket: dependencies.digitalBucket,
   }));
-  app.use('/api/solicitudes', createPublicLoanRoutes({ service: dependencies.loansService }));
+  app.use('/api/solicitudes', createPublicLoanRoutes({
+    service: dependencies.loansService,
+    authenticateClient: dependencies.authenticateClient,
+  }));
   app.use('/api/prestamos', createStaffLoanRoutes({ service: dependencies.loansService, authenticate: dependencies.authenticate }));
   app.use('/api/admin', createAdminRoutes({ service: dependencies.adminService, authenticate: dependencies.authenticate }));
   app.use('/api/movimientos', createMovementsRoutes({

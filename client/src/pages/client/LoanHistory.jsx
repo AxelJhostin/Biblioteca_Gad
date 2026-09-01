@@ -1,0 +1,12 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { clientApi } from '../../api.js';
+import EmptyState from '../../components/EmptyState.jsx';
+import { formatDateTime, stateClass } from '../../lib/format.js';
+
+export default function LoanHistory() {
+  const [items, setItems] = useState([]); const [loading, setLoading] = useState(true); const [filter, setFilter] = useState('');
+  useEffect(() => { clientApi.get('/clientes/me/prestamos').then(({ data }) => setItems(data.items)).finally(() => setLoading(false)); }, []);
+  const visible = filter ? items.filter((item) => item.estado === filter) : items;
+  return <div className="container py-4 py-md-5 client-account-page"><div className="account-page-header"><div><Link to="/mi-cuenta" className="back-link"><i className="fas fa-arrow-left me-2" />Mi cuenta</Link><h1>Solicitudes y préstamos</h1><p>Solo tú puedes consultar este historial.</p></div><select className="form-select" aria-label="Filtrar por estado" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="activo">Activos</option><option value="atrasado">Atrasados</option><option value="devuelto">Devueltos</option><option value="rechazado">Rechazados</option></select></div>{loading ? <div className="page-loader"><span className="spinner-border text-success" /></div> : !visible.length ? <EmptyState title="Sin registros" text="No hay actividad que coincida con este filtro." /> : <div className="account-history-list">{visible.map((loan) => <Link to={`/mi-cuenta/prestamos/${loan.id}`} className="card account-history-item" key={loan.id}><div><strong>{loan.codigo}</strong><small>{formatDateTime(loan.fecha_solicitud)}</small></div><div className="account-history-books">{loan.detalles.map((detail) => <span key={detail.id}>{detail.titulo} · {detail.cantidad_solicitada} unidad(es)</span>)}</div><span className={`badge bg-${stateClass(loan.estado)}`}>{loan.estado}</span><i className="fas fa-chevron-right" /></Link>)}</div>}</div>;
+}

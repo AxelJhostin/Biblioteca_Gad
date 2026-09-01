@@ -1,0 +1,12 @@
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useClientAuth } from '../../state/ClientAuthContext.jsx';
+import { serverFieldErrors } from '../../lib/requestValidation.js';
+
+export default function Security() {
+  const { user, changePassword } = useClientAuth();
+  const [form, setForm] = useState({ password_actual: '', password_nuevo: '', confirmar_password: '' });
+  const [errors, setErrors] = useState({}); const [message, setMessage] = useState(''); const [loading, setLoading] = useState(false); const navigate = useNavigate();
+  const submit = async (event) => { event.preventDefault(); setLoading(true); setMessage(''); try { await changePassword(form); navigate('/mi-cuenta', { replace: true }); } catch (error) { setErrors(serverFieldErrors(error.response?.data)); setMessage(error.response?.data?.message || 'No pudimos cambiar la contraseña.'); } finally { setLoading(false); } };
+  return <div className="container py-4 py-md-5 client-account-page">{!user.debe_cambiar_password && <Link to="/mi-cuenta" className="back-link"><i className="fas fa-arrow-left me-2" />Mi cuenta</Link>}<div className="card account-form-card mt-3"><div className="card-body p-4 p-md-5"><span className="eyebrow">Seguridad</span><h1>{user.debe_cambiar_password ? 'Cambia tu contraseña temporal' : 'Cambiar contraseña'}</h1><p className="text-muted">{user.debe_cambiar_password ? 'Debes crear una contraseña personal antes de realizar solicitudes.' : 'Al guardar, las demás sesiones dejarán de ser válidas.'}</p>{message && <div className="alert alert-danger">{message}</div>}<form onSubmit={submit} noValidate>{[['password_actual','Contraseña actual'],['password_nuevo','Nueva contraseña'],['confirmar_password','Confirmar nueva contraseña']].map(([name,label]) => <div className="mb-3" key={name}><label className="form-label" htmlFor={`security-${name}`}>{label}</label><input id={`security-${name}`} type="password" autoComplete={name === 'password_actual' ? 'current-password' : 'new-password'} className={`form-control${errors[name] ? ' is-invalid' : ''}`} value={form[name]} onChange={(e) => setForm({ ...form, [name]: e.target.value })} />{errors[name] && <div className="invalid-feedback">{errors[name]}</div>}</div>)}<button className="btn btn-primary" disabled={loading}>{loading ? 'Actualizando…' : 'Guardar nueva contraseña'}</button></form></div></div></div>;
+}

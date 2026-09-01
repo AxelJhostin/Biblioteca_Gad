@@ -11,13 +11,16 @@ La base funcional incluye:
 - Catálogo público con búsqueda por título, autor, género y tipo de material.
 - Portada opcional, detalle de obra y disponibilidad física calculada.
 - Visor PDF integrado con zoom de 50 % a 200 %, vista de una o dos páginas, transición tipo hoja, teclado y gestos táctiles; sin enlace de descarga creado por la aplicación.
-- Solicitud de varios libros y cantidades sin crear cuenta de cliente.
+- Registro, activación e inicio de sesión de clientes con cédula ecuatoriana.
+- Solicitud física autenticada de varios libros y cantidades, conservando la selección al ingresar.
+- Mi cuenta con historial propio, detalle, perfil y cambio de contraseña.
 - Prioridad transaccional por orden de llegada para el último ejemplar.
 - Login para bibliotecarios y administradores.
 - Aprobación/entrega, préstamo directo presencial, rechazo y devoluciones parciales o completas.
 - Vencimientos y bloqueo de clientes con material activo o atrasado.
 - Gestión de catálogo, archivos digitales y cuentas del personal.
 - Restablecimiento de contraseña de bibliotecarios solo por administrador.
+- Activación y restablecimiento de cuentas de clientes por bibliotecario o administrador.
 - Historial funcional de Movimientos accesible al administrador.
 - Exportación de inventario, préstamos y movimientos en PDF/Excel con formato municipal.
 - Pruebas unitarias, integración HTTP, E2E con navegador y compilación de producción.
@@ -26,7 +29,7 @@ Los requisitos que gobiernan el desarrollo están en [Requerimientos_Biblioteca_
 
 El despliegue completo en Supabase, Render y Vercel está documentado en [DEPLOY_SUPABASE_RENDER.md](./DEPLOY_SUPABASE_RENDER.md). La sustitución del Supabase anterior permanece preparada pero aplazada; ningún dato remoto fue modificado.
 
-La situación de cierre, el procedimiento de relevo y la lista de entrega institucional están en [ENTREGA_FINAL_PASANTIA.md](./ENTREGA_FINAL_PASANTIA.md). La ampliación pendiente para cuentas de clientes está definida por separado en [PLAN_CUENTAS_CLIENTES.md](./PLAN_CUENTAS_CLIENTES.md); todavía no forma parte del código ni de la base de datos.
+La situación de cierre, el procedimiento de relevo y la lista de entrega institucional están en [ENTREGA_FINAL_PASANTIA.md](./ENTREGA_FINAL_PASANTIA.md). La implementación de cuentas de clientes sigue el diseño de [PLAN_CUENTAS_CLIENTES.md](./PLAN_CUENTAS_CLIENTES.md).
 
 ## Arquitectura
 
@@ -44,6 +47,7 @@ server/                          Node.js + Express
 ├── src/db/                     pool y transacciones PostgreSQL
 ├── src/modules/                módulos por dominio
 │   ├── auth/
+│   ├── client-auth/
 │   ├── catalog/
 │   ├── loans/
 │   ├── admin/
@@ -167,6 +171,8 @@ ADMIN_PASSWORD="una-contraseña-temporal-segura"
 LIBRARIAN_NAME=Bibliotecaria de Pruebas
 LIBRARIAN_USER=bibliotecaria
 LIBRARIAN_PASSWORD="Biblioteca#2026"
+CLIENT_DEMO_IDENTIFICATION=1301000001
+CLIENT_DEMO_PASSWORD="Lector#Demo2026"
 ```
 
 Luego ejecute:
@@ -175,10 +181,11 @@ Luego ejecute:
 npm run db:seed
 ```
 
-El script es repetible y prepara el administrador y, cuando se define `LIBRARIAN_PASSWORD`, la cuenta bibliotecaria local. En el entorno de desarrollo incluido se puede probar con:
+El script es repetible y prepara el administrador, la cuenta bibliotecaria y, cuando se define `CLIENT_DEMO_PASSWORD`, una cuenta asociada al cliente sintético. En el entorno de desarrollo incluido se puede probar con:
 
 - Administrador: `admin` / `Admin#Cambiar2026`
 - Bibliotecaria: `bibliotecaria` / `Biblioteca#2026`
+- Cliente: `1301000001` / `Lector#Demo2026`
 
 Estas credenciales son únicamente para Docker local y deben reemplazarse u omitirse antes de publicar.
 
@@ -291,6 +298,9 @@ No existe un campo editable de cantidad disponible.
 - Los bibliotecarios no tienen recuperación por correo ni autogestión.
 - Solo un administrador puede restablecer la contraseña de un bibliotecario.
 - Una cuenta inactiva es rechazada en cada operación protegida, incluso si conserva un JWT anterior.
+- Las sesiones de Cliente y Personal usan tokens y claves de almacenamiento separados; el tipo de token se valida en la API.
+- Cinco intentos consecutivos de acceso de Cliente provocan un bloqueo temporal de 15 minutos.
+- Cambiar o restablecer la contraseña de un Cliente incrementa su versión de sesión e invalida tokens anteriores.
 
 ## API principal
 
@@ -300,8 +310,19 @@ No existe un campo editable de cantidad disponible.
 | `GET` | `/api/catalogo/:id` | Público |
 | `GET` | `/api/catalogo/:id/portada` | Público |
 | `GET` | `/api/catalogo/:id/visor` | Público condicionado |
-| `POST` | `/api/solicitudes` | Público, con rate limit |
-| `GET` | `/api/solicitudes/:codigo/consulta` | Público con identificación |
+| `POST` | `/api/clientes/auth/registro` | Público, con rate limit |
+| `POST` | `/api/clientes/auth/activar` | Público, con verificación y rate limit |
+| `POST` | `/api/clientes/auth/login` | Público, con rate limit |
+| `GET` | `/api/clientes/auth/me` | Cliente |
+| `POST` | `/api/clientes/auth/cambiar-password` | Cliente |
+| `GET/PATCH` | `/api/clientes/me` | Cliente |
+| `GET` | `/api/clientes/me/prestamos[/:id]` | Cliente propietario |
+| `POST` | `/api/clientes/me/solicitudes` | Cliente |
+| `POST` | `/api/solicitudes` | Cliente, alias protegido |
+| `GET` | `/api/solicitudes/:codigo/consulta` | Cliente propietario |
+| `GET` | `/api/clientes` | Bibliotecario/Administrador |
+| `POST` | `/api/clientes/:id/activar-cuenta` | Bibliotecario/Administrador |
+| `POST` | `/api/clientes/:id/restablecer-password` | Bibliotecario/Administrador |
 | `POST` | `/api/auth/login` | Personal |
 | `GET` | `/api/prestamos` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/directo` | Bibliotecario/Administrador |

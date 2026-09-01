@@ -8,6 +8,8 @@ const password = process.env.ADMIN_PASSWORD;
 const librarianName = process.env.LIBRARIAN_NAME || 'Bibliotecaria de Pruebas';
 const librarianUser = process.env.LIBRARIAN_USER || 'bibliotecaria';
 const librarianPassword = process.env.LIBRARIAN_PASSWORD;
+const clientIdentification = process.env.CLIENT_DEMO_IDENTIFICATION || '1301000001';
+const clientPassword = process.env.CLIENT_DEMO_PASSWORD;
 
 if (!password || password.length < 10) {
   throw new Error('Configure ADMIN_PASSWORD con al menos 10 caracteres antes de ejecutar el seed.');
@@ -41,6 +43,28 @@ try {
       [librarianName, librarianUser, librarianHash],
     );
     console.log(`Cuenta bibliotecaria de prueba preparada: ${librarianUser}`);
+  }
+  if (clientPassword) {
+    if (clientPassword.length < 10) throw new Error('CLIENT_DEMO_PASSWORD debe tener al menos 10 caracteres.');
+    const clientHash = await bcrypt.hash(clientPassword, 12);
+    const { rows } = await db.query(
+      'select id from public.clientes where identificacion = $1 limit 1',
+      [clientIdentification],
+    );
+    if (!rows[0]) throw new Error(`No existe el cliente local de demostración ${clientIdentification}.`);
+    await db.query(
+      `insert into public.cuentas_clientes (cliente_id, password_hash, estado, debe_cambiar_password)
+       values ($1, $2, true, false)
+       on conflict (cliente_id) do update
+         set password_hash = excluded.password_hash,
+             estado = true,
+             debe_cambiar_password = false,
+             intentos_fallidos = 0,
+             bloqueado_hasta = null,
+             version_sesion = public.cuentas_clientes.version_sesion + 1`,
+      [rows[0].id, clientHash],
+    );
+    console.log(`Cuenta cliente de prueba preparada: ${clientIdentification}`);
   }
 } finally {
   await db.close();

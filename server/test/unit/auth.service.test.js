@@ -13,6 +13,7 @@ test('autentica una cuenta activa y firma un token verificable', async () => {
   const result = await service.login({ usuario: 'admin', password: 'Segura#2026' });
   assert.equal(result.user.rol, 'administrador');
   assert.equal(service.verify(result.token).sub, '1');
+  assert.equal(service.verify(result.token).type, 'personal');
   assert.equal(marked, true);
 });
 
@@ -24,4 +25,3 @@ test('rechaza credenciales incorrectas sin revelar qué dato falló', async () =
   const service = createAuthService({ repository, jwtSecret: 'secreto-de-pruebas-suficientemente-largo', jwtTtl: 3600 });
   await assert.rejects(service.login({ usuario: 'nadie', password: 'incorrecta' }), (error) => error.code === 'INVALID_CREDENTIALS');
 });
-
