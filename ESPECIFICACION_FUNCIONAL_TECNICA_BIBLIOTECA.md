@@ -99,8 +99,11 @@ Notas:
 
 1. Desde una ficha con archivo digital disponible, la persona selecciona **Leer en línea**.
 2. El sistema abre el visor dentro de una página o modal de la aplicación.
-3. El visor muestra páginas, zoom y navegación; no ofrece un control de descarga ni enlaza al archivo original.
-4. Si no existe archivo digital o está inactivo, la acción no se muestra.
+3. El visor ofrece zoom entre 50 % y 200 %, navegación con botones, teclado y gesto horizontal.
+4. En pantallas amplias puede alternarse entre página individual y libro abierto: la portada aparece sola y las páginas interiores se agrupan 2–3, 4–5 y sucesivamente.
+5. El cambio de página usa una transición breve tipo hoja; `prefers-reduced-motion` la desactiva. En móvil se prioriza una página por vez para conservar legibilidad y rendimiento.
+6. El visor no ofrece un control de descarga ni enlaza al archivo original.
+7. Si no existe archivo digital o está inactivo, la acción no se muestra.
 
 > Restricción conocida: ningún visor web puede impedir de forma absoluta que una persona capture contenido mostrado en su navegador. El requisito se implementa como ausencia de descarga directa, URLs no expuestas en la interfaz, autorización del endpoint de visualización y entrega optimizada para lectura; no como un mecanismo DRM.
 

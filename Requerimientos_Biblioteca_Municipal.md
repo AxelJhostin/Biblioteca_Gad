@@ -119,7 +119,7 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 1. Ver y navegar el catálogo completo, buscar por título, autor, género o tipo de material, y consultar el detalle de cada libro.
 2. Ver disponibilidad física (cantidad disponible) de un libro.
 3. Ver si el libro tiene versión digital disponible.
-4. Visualizar el libro digital mediante visor embebido (sin descarga).
+4. Visualizar el libro digital mediante visor embebido (sin descarga), con zoom, navegación y vista opcional de una o dos páginas. La portada se presenta sola y las páginas interiores pueden mostrarse como un libro abierto.
 5. Solicitar préstamo de uno o varios libros físicos, ingresando sus datos de contacto en ese momento.
 
 ### 3.2 Bibliotecario (con autenticación)
@@ -159,6 +159,7 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 - Al crear solicitudes concurrentes por el último ejemplar disponible, la primera solicitud válida en orden de fecha y hora aparta la unidad. Las solicitudes posteriores sin disponibilidad se rechazan automáticamente; no se crea una reserva o lista de espera.
 - Rechazar una solicitud únicamente cambia su estado a `rechazado` y registra el movimiento correspondiente. No genera notificaciones ni otras acciones hacia el cliente.
 - No se requiere un mecanismo de respaldo adicional dentro de la aplicación: la base de datos en la nube gestiona sus propios respaldos.
+- El visor digital debe funcionar con teclado y controles táctiles. En pantallas móviles se prioriza una página por vez; las transiciones se reducen si el dispositivo solicita menos movimiento.
 - Los reportes son documentos de consulta: no modifican datos y solo pueden generarse desde una sesión de personal activa.
 - Los archivos PDF y Excel deben incluir identidad municipal, título, fecha y hora de emisión, responsable autenticado, filtros aplicados y total de registros.
 - El bibliotecario puede exportar inventario y préstamos. La exportación de Movimientos es exclusiva del Administrador.

@@ -10,7 +10,7 @@ La base funcional incluye:
 
 - Catálogo público con búsqueda por título, autor, género y tipo de material.
 - Portada opcional, detalle de obra y disponibilidad física calculada.
-- Visor PDF integrado, sin enlace de descarga creado por la aplicación.
+- Visor PDF integrado con zoom de 50 % a 200 %, vista de una o dos páginas, transición tipo hoja, teclado y gestos táctiles; sin enlace de descarga creado por la aplicación.
 - Solicitud de varios libros y cantidades sin crear cuenta de cliente.
 - Prioridad transaccional por orden de llegada para el último ejemplar.
 - Login para bibliotecarios y administradores.
@@ -268,6 +268,9 @@ No existe un campo editable de cantidad disponible.
 
 - Portadas: JPG, PNG o WebP.
 - Lectura digital V1: PDF.
+- El lector permite alternar entre página individual y pliego de dos páginas en pantallas amplias; la portada permanece individual.
+- Zoom entre 50 % y 200 %, navegación mediante botones, flechas del teclado o deslizamiento horizontal. En móvil se usa una página para conservar legibilidad y rendimiento.
+- La transición tipo hoja respeta la preferencia del sistema `prefers-reduced-motion`.
 - No existe un límite de tamaño definido por la aplicación; siguen aplicando los límites técnicos del proveedor y la infraestructura.
 - Los buckets son privados y se crean desde el servidor cuando se realiza la primera carga.
 - La API entrega PDF con disposición `inline` y sin caché privada persistente.
