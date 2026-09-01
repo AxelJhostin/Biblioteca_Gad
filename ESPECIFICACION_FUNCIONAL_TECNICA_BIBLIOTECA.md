@@ -67,6 +67,7 @@ Principios de negocio:
 | Solicitar préstamo sin login | Sí | — | — |
 | Revisar solicitudes | — | Sí | Sí |
 | Aprobar, rechazar, entregar o devolver | — | Sí | Sí |
+| Registrar préstamo directo presencial | — | Sí | Sí |
 | Consultar préstamos activos y atrasados | — | Sí | Sí |
 | Crear o editar libros y autores | — | — | Sí |
 | Cargar o reemplazar archivo digital | — | — | Sí |
@@ -102,7 +103,7 @@ Notas:
 
 1. La persona agrega uno o varios libros físicos disponibles a una solicitud.
 2. Por cada libro indica una cantidad entera mayor a cero, hasta la disponibilidad mostrada.
-3. Completa identificación, nombre completo y al menos un medio de contacto (teléfono o correo).
+3. Completa cédula ecuatoriana de 10 dígitos, nombre completo sin números y al menos un medio de contacto (teléfono ecuatoriano o correo).
 4. La API verifica que el cliente no tenga préstamos activos o atrasados y, dentro de una transacción, comprueba las existencias que no están prestadas ni apartadas previamente.
 5. La primera solicitud válida que llega por una cantidad disponible queda en estado `pendiente` y aparta esas unidades. El orden lo determina el registro exitoso de la transacción y su fecha/hora.
 6. Si no hay unidades suficientes, la solicitud se registra automáticamente como `rechazado`, sin apartar existencias ni crear lista de espera. La respuesta informa que el material ya no está disponible.
@@ -125,6 +126,14 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 3. La API impide devolver más unidades de las que siguen pendientes.
 4. Al devolver parcialmente, las unidades devueltas vuelven a estar disponibles y el préstamo sigue `activo` o `atrasado` si aún vence.
 5. Cuando todas las líneas están devueltas, se registra la fecha real de devolución y el préstamo queda `devuelto`.
+
+### 5.5.1 Préstamo directo presencial
+
+1. El bibliotecario abre **Préstamos** y selecciona **Nuevo préstamo**.
+2. Ingresa cédula ecuatoriana, nombre sin números, al menos un contacto, fecha límite y uno o varios materiales disponibles.
+3. La API bloquea los libros en orden estable, comprueba existencias y verifica que el cliente no tenga otro préstamo activo o atrasado.
+4. En una sola transacción se crea el préstamo `activo`, se registran aprobación y entrega con el personal autenticado y se genera su Movimiento.
+5. Si falta disponibilidad o el cliente está bloqueado, no se crea un préstamo parcial y la interfaz explica el motivo.
 
 ### 5.6 Vencimientos y bloqueo
 
@@ -151,6 +160,7 @@ Al recibir una solicitud pública, se registra un Movimiento de tipo `préstamo`
 | RN-12 | Solo un administrador puede modificar catálogo, archivos digitales o cuentas del personal. |
 | RN-13 | La lectura digital es pública cuando el libro está marcado como digital y tiene un archivo activo; el archivo no se ofrece como descarga. |
 | RN-14 | Aprobar préstamo, rechazar solicitud, registrar devolución, ingresar libro y editar libro generan obligatoriamente un Movimiento con actor, fecha/hora, referencias y detalle opcional. |
+| RN-15 | En una solicitud pública, la cédula contiene exactamente 10 dígitos; el nombre no admite números; y el teléfono, cuando se proporciona, debe ser un celular ecuatoriano `09` de 10 dígitos o un fijo nacional de 9 dígitos. |
 
 ## 7. Modelo de información
 
@@ -164,7 +174,7 @@ Los identificadores técnicos pueden ser enteros autogenerados. El **ID Libro** 
 | `autores` | `id`, `nombre_completo`, fechas | Nombre obligatorio; se normaliza para evitar duplicados accidentales. |
 | `libro_autores` | `libro_id`, `autor_id`, `orden` | Relación muchos a muchos; pareja única. |
 | `archivos_digitales` | `id`, `libro_id`, `nombre_original`, `ruta_segura`, `mime_type`, `tamano_bytes`, `estado`, fechas | En V1, un archivo activo por libro; conservar versiones inactivas para historial. |
-| `clientes` | `id`, `identificacion`, `nombre_completo`, `telefono`, `correo`, fechas | No son cuentas. Identificación única. Teléfono o correo obligatorio. |
+| `clientes` | `id`, `identificacion`, `nombre_completo`, `telefono`, `correo`, fechas | No son cuentas. La identificación es una cédula ecuatoriana única de 10 dígitos. El nombre no admite números. Teléfono ecuatoriano o correo obligatorio. |
 | `cuentas_personal` | `id`, `nombre_completo`, `usuario`, `password_hash`, `rol`, `estado`, último acceso, fechas | Roles fijos: `bibliotecario`, `administrador`. Nunca se guarda contraseña en texto. |
 | `prestamos` | `id`, `codigo`, `cliente_id`, `bibliotecario_id`, `fecha_solicitud`, `fecha_aprobacion`, `fecha_entrega`, `fecha_limite`, `fecha_devolucion`, `estado`, `motivo_rechazo`, fechas | `codigo` público de consulta; bibliotecario nulo hasta la revisión; una solicitud pendiente mantiene cantidades apartadas. |
 | `prestamo_detalles` | `id`, `prestamo_id`, `libro_id`, `cantidad_solicitada`, `cantidad_devuelta`, `fecha_ultima_devolucion` | Pendiente = solicitada − devuelta; no se eliminan líneas ya operadas. |
@@ -219,6 +229,7 @@ El estado `aprobado` mencionado en el levantamiento queda registrado mediante `f
 | Inicio | Sí | Sí | Indicadores operativos: solicitudes pendientes, préstamos activos y atrasados. No sustituye reportes. |
 | Solicitudes | Sí | Sí | Filtrar, ver detalle, aprobar y entregar o rechazar. |
 | Préstamos | Sí | Sí | Buscar, consultar vencimientos y registrar devoluciones parciales o totales. |
+| Préstamo directo | Sí | Sí | Registrar datos del cliente, seleccionar materiales disponibles y entregar en una operación. |
 | Catálogo | Consulta | Gestión total | Existencias, ficha, alta, edición y estado de libros. |
 | Autores | Consulta | Gestión total | Crear, editar y asociar autores. |
 | Digitales | Consulta de estado | Gestión total | Cargar, reemplazar, activar o desactivar archivo digital. |
@@ -287,11 +298,10 @@ Las respuestas usan JSON con `ok`, `message` cuando corresponda y datos en la cl
 | `GET` | `/api/solicitudes/:codigo/consulta` | Público | Consultar estado básico mediante código e identificación. |
 | `POST` | `/api/auth/login` | Público | Login de personal. |
 | `GET` | `/api/auth/me` | Personal | Validar y recuperar sesión. |
-| `GET` | `/api/solicitudes` | Bibliotecario/Admin | Bandeja y filtros de solicitudes. |
-| `POST` | `/api/solicitudes/:id/aprobar-entregar` | Bibliotecario/Admin | Definir fecha límite, verificar stock y activar préstamo. |
-| `POST` | `/api/solicitudes/:id/rechazar` | Bibliotecario/Admin | Rechazar una solicitud pendiente. |
 | `GET` | `/api/prestamos` | Bibliotecario/Admin | Listar préstamos activos, atrasados e historial. |
-| `GET` | `/api/prestamos/:id` | Bibliotecario/Admin | Detalle e historial de devolución. |
+| `POST` | `/api/prestamos/directo` | Bibliotecario/Admin | Registrar y entregar un préstamo presencial en una transacción. |
+| `POST` | `/api/prestamos/:id/aprobar-entregar` | Bibliotecario/Admin | Definir fecha límite y activar una solicitud pendiente. |
+| `POST` | `/api/prestamos/:id/rechazar` | Bibliotecario/Admin | Rechazar una solicitud pendiente. |
 | `POST` | `/api/prestamos/:id/devoluciones` | Bibliotecario/Admin | Registrar devolución por líneas y cantidades. |
 | `GET` | `/api/admin/libros` | Admin | Catálogo administrativo. |
 | `POST/PATCH` | `/api/admin/libros[/:id]` | Admin | Crear o editar libro. |
@@ -385,8 +395,8 @@ Estas decisiones no bloquean la construcción de la base, pero deben confirmarse
 | Identidad visual | Se reutiliza el logo y línea visual de Rehabilitación GAD, por ser del mismo Municipio de Jipijapa. | No pendiente para iniciar. |
 | Archivos digitales | PDF sin límite de tamaño definido por la aplicación y un archivo activo por libro. | Confirmar formatos adicionales y autorización de obras. |
 | Almacenamiento | Supabase Storage privado servido por API; respaldos de base de datos gestionados por el proveedor en la nube. | Confirmar cuenta/proyecto y política vigente del proveedor. |
-| Contacto | Teléfono y/o correo obligatorio. | Definir formato preferido de teléfono y si se requerirá ambos. |
-| Identificación | Campo de texto único, sin asumir un tipo documental específico. | Confirmar si solo se aceptará cédula ecuatoriana u otros documentos. |
+| Contacto | Teléfono ecuatoriano y/o correo obligatorio. El teléfono, si se ingresa, es celular `09` de 10 dígitos o fijo nacional de 9 dígitos. | Confirmado para V1. |
+| Identificación | Cédula ecuatoriana única de exactamente 10 dígitos numéricos. | Confirmado para V1. |
 | Reportes | Solo Movimientos y panel operativo en V1. | Definir indicadores y exportaciones para una fase posterior. |
 | Notificaciones | No hay notificaciones externas en V1. | Confirmar necesidad de correo, WhatsApp o recordatorios. |
 

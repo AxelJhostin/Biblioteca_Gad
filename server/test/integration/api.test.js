@@ -27,6 +27,7 @@ function dependencies() {
       createRequest: async () => ({ rejected: false, loan: { codigo: 'SOL-UNO', estado: 'pendiente' } }),
       getPublicStatus: async () => ({ codigo: 'SOL-UNO', estado: 'pendiente' }),
       list: async () => [], approveAndDeliver: async () => ({}), reject: async () => ({}), registerReturn: async () => ({}),
+      createDirectLoan: async () => ({ id: 5, codigo: 'SOL-DIRECTO', estado: 'activo' }),
     },
     adminService: { listStaff: async () => [], createBook: async () => ({}), updateBook: async () => ({}), uploadCover: async () => ({}), uploadDigital: async () => ({}), createStaff: async () => ({}), updateStaff: async () => ({}), resetPassword: async () => ({}) },
     movementsRepository: { list: async () => [] },
@@ -53,4 +54,11 @@ test('protege los módulos internos y permite una sesión válida', async () => 
   await request(app).get('/api/prestamos').expect(401);
   const response = await request(app).get('/api/prestamos').set('Authorization', 'Bearer staff').expect(200);
   assert.deepEqual(response.body.items, []);
+});
+
+test('permite al personal registrar un préstamo directo', async () => {
+  const app = createApp({ dependencies: dependencies() });
+  const response = await request(app).post('/api/prestamos/directo').set('Authorization', 'Bearer staff').send({}).expect(201);
+  assert.equal(response.body.item.estado, 'activo');
+  assert.equal(response.body.item.codigo, 'SOL-DIRECTO');
 });

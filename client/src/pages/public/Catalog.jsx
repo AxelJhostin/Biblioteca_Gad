@@ -12,12 +12,23 @@ export default function Catalog() {
   const [query, setQuery] = useState(initialFilters);
   const [data, setData] = useState({ items: [], pagination: {} });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const { add } = useRequest();
 
   useEffect(() => {
+    const timer = setTimeout(() => setQuery((current) => Object.keys(filters).every((key) => current[key] === filters[key]) ? current : { ...filters }), 300);
+    return () => clearTimeout(timer);
+  }, [filters]);
+
+  useEffect(() => {
+    let active = true;
     setLoading(true);
+    setLoadError('');
     const params = Object.fromEntries(Object.entries(query).filter(([, value]) => value !== '' && value !== false));
-    api.get('/catalogo', { params }).then(({ data: response }) => setData(response)).finally(() => setLoading(false));
+    api.get('/catalogo', { params }).then(({ data: response }) => { if (active) setData(response); })
+      .catch(() => { if (active) { setData({ items: [], pagination: {} }); setLoadError('No pudimos actualizar el catálogo. Inténtalo nuevamente.'); } })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [query]);
 
   const submit = (event) => { event.preventDefault(); setQuery(filters); };
@@ -44,8 +55,8 @@ export default function Catalog() {
         <div className="container py-4 py-md-5">
           <form className="search-panel" onSubmit={submit}>
             <div className="search-main"><i className="fas fa-magnifying-glass" /><input value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} placeholder="Buscar por título, autor, género o tipo…" /></div>
-            <select value={filters.tipo} onChange={(e) => setFilters({ ...filters, tipo: e.target.value })}><option value="">Todos los materiales</option><option value="libro">Libros</option><option value="revista">Revistas</option><option value="folleto">Folletos</option><option value="tesis">Tesis</option></select>
-            <select value={filters.genero} onChange={(e) => setFilters({ ...filters, genero: e.target.value })}><option value="">Todos los géneros</option><option value="lirico">Lírico</option><option value="poesia">Poesía</option><option value="narrativa">Narrativa</option><option value="ensayo">Ensayo</option></select>
+            <select aria-label="Filtrar por tipo de material" value={filters.tipo} onChange={(e) => setFilters({ ...filters, tipo: e.target.value })}><option value="">Todos los materiales</option><option value="libro">Libros</option><option value="revista">Revistas</option><option value="folleto">Folletos</option><option value="tesis">Tesis</option></select>
+            <select aria-label="Filtrar por género" value={filters.genero} onChange={(e) => setFilters({ ...filters, genero: e.target.value })}><option value="">Todos los géneros</option><option value="lirico">Lírico</option><option value="poesia">Poesía</option><option value="narrativa">Narrativa</option><option value="ensayo">Ensayo</option></select>
             <button className="btn btn-primary" type="submit">Buscar</button>
             <div className="search-toggles">
               <label><input type="checkbox" checked={filters.disponible} onChange={(e) => setFilters({ ...filters, disponible: e.target.checked })} /> Disponibles</label>
@@ -54,7 +65,8 @@ export default function Catalog() {
           </form>
 
           <div className="d-flex justify-content-between align-items-center my-4"><div><h4 className="mb-0">Catálogo municipal</h4><small className="text-muted">{data.pagination.total || 0} materiales encontrados</small></div></div>
-          {loading ? <div className="page-loader"><span className="spinner-border text-success" /></div> : data.items.length === 0 ? <EmptyState title="No encontramos materiales" text="Prueba con otros términos o limpia los filtros." /> : (
+          {loadError && <div className="alert alert-danger"><i className="fas fa-circle-exclamation me-2" />{loadError}</div>}
+          {loading ? <div className="page-loader"><span className="spinner-border text-success" /></div> : data.items.length === 0 ? <EmptyState title="No encontramos materiales" text="Prueba con otros términos o limpia los filtros." action={<button className="btn btn-light" onClick={() => setFilters(initialFilters)}>Limpiar filtros</button>} /> : (
             <div className="row g-4">
               {data.items.map((book) => <div className="col-sm-6 col-lg-4 col-xl-3" key={book.id}>
                 <article className="book-card">
@@ -78,4 +90,3 @@ export default function Catalog() {
     </>
   );
 }
-

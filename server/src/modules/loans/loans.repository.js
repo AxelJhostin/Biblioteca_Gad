@@ -59,6 +59,16 @@ export function createLoansRepository(db) {
       );
       return rows[0];
     },
+    async createDirectLoan(tx, { clientId, staffId, dueDate }) {
+      const { rows } = await executor(tx).query(
+        `insert into public.prestamos
+          (cliente_id, bibliotecario_id, fecha_aprobacion, fecha_entrega, fecha_limite, estado)
+         values ($1, $2, now(), now(), $3, 'activo')
+         returning *`,
+        [clientId, staffId, dueDate],
+      );
+      return rows[0];
+    },
     async addDetails(tx, loanId, items) {
       for (const item of items) {
         await executor(tx).query(
@@ -94,7 +104,17 @@ export function createLoansRepository(db) {
                 coalesce(json_agg(json_build_object(
                   'id', d.id, 'libro_id', d.libro_id, 'titulo', l.titulo,
                   'id_libro_texto', l.id_libro_texto, 'cantidad_solicitada', d.cantidad_solicitada,
-                  'cantidad_devuelta', d.cantidad_devuelta
+                  'cantidad_devuelta', d.cantidad_devuelta,
+                  'tipo_material', l.tipo_material, 'tipo_material_otro', l.tipo_material_otro,
+                  'genero', l.genero, 'genero_otro', l.genero_otro,
+                  'anio_publicacion', l.anio_publicacion, 'descripcion', l.descripcion,
+                  'cantidad_total', l.cantidad_total, 'tiene_portada', l.portada_path is not null,
+                  'autores', coalesce((select json_agg(json_build_object(
+                    'id', a.id, 'nombre_completo', a.nombre_completo
+                  ) order by la.orden)
+                    from public.libro_autores la
+                    join public.autores a on a.id = la.autor_id
+                   where la.libro_id = l.id), '[]'::json)
                 ) order by d.id) filter (where d.id is not null), '[]') as detalles
            from public.prestamos p
            join public.clientes c on c.id = p.cliente_id
@@ -181,4 +201,3 @@ export function createLoansRepository(db) {
     },
   };
 }
-

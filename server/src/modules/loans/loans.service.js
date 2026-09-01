@@ -4,18 +4,29 @@ import { cleanText, normalizeDocument } from '../../core/validation.js';
 
 const requestSchema = z.object({
   cliente: z.object({
-    identificacion: z.string().min(3).max(40),
-    nombre_completo: z.string().min(3).max(180),
-    telefono: z.string().max(40).optional().default(''),
-    correo: z.union([z.literal(''), z.email()]).optional().default(''),
+    identificacion: z.string().transform(normalizeDocument).pipe(z.string()
+      .regex(/^\d{10}$/, 'La cédula debe contener exactamente 10 dígitos numéricos.')),
+    nombre_completo: z.string().transform(cleanText).pipe(z.string()
+      .min(3, 'Ingresa el nombre completo del solicitante.')
+      .max(180, 'El nombre no puede superar 180 caracteres.')
+      .regex(/^[\p{L}]+(?:[\s.'’-][\p{L}]+)*$/u, 'El nombre solo puede contener letras, espacios, apóstrofes, puntos o guiones.')),
+    telefono: z.string().optional().default('').transform(cleanText).pipe(z.string()
+      .max(40, 'El teléfono no puede superar 40 caracteres.')
+      .refine((value) => {
+        if (!value) return true;
+        return /^09\d{8}$/.test(value) || /^0[2-7]\d{7}$/.test(value);
+      }, 'Ingresa un número ecuatoriano válido: celular de 10 dígitos (09…) o fijo de 9 dígitos.')),
+    correo: z.string().optional().default('').transform((value) => cleanText(value).toLowerCase()).pipe(
+      z.union([z.literal(''), z.email('Ingresa un correo electrónico válido.')]),
+    ),
   }),
   items: z.array(z.object({
     libro_id: z.coerce.number().int().positive(),
     cantidad: z.coerce.number().int().positive().max(100),
-  })).min(1).max(20),
+  })).min(1, 'Añade al menos un libro antes de enviar la solicitud.').max(20, 'Una solicitud admite hasta 20 libros.'),
 }).superRefine((value, ctx) => {
   if (!cleanText(value.cliente.telefono) && !cleanText(value.cliente.correo)) {
-    ctx.addIssue({ code: 'custom', path: ['cliente', 'telefono'], message: 'Ingrese teléfono o correo.' });
+    ctx.addIssue({ code: 'custom', path: ['cliente', 'telefono'], message: 'Ingresa un teléfono o un correo para poder gestionar la solicitud.' });
   }
   if (new Set(value.items.map((item) => item.libro_id)).size !== value.items.length) {
     ctx.addIssue({ code: 'custom', path: ['items'], message: 'Cada libro debe aparecer una sola vez.' });
@@ -29,16 +40,20 @@ const returnSchema = z.object({
   })).min(1),
 });
 
+const directLoanSchema = requestSchema.and(z.object({
+  fecha_limite: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha límite es obligatoria.'),
+}));
+
+function validateDueDate(dueDate) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dueDate || ''))) throw new ValidationError('La fecha límite es obligatoria.');
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil' }).format(new Date());
+  if (dueDate < today) throw new ValidationError('La fecha límite no puede ser anterior a hoy.');
+}
+
 export function createLoansService(repository) {
   return {
     async createRequest(payload) {
       const input = requestSchema.parse(payload);
-      input.cliente = {
-        identificacion: normalizeDocument(input.cliente.identificacion),
-        nombre_completo: cleanText(input.cliente.nombre_completo),
-        telefono: cleanText(input.cliente.telefono),
-        correo: cleanText(input.cliente.correo).toLowerCase(),
-      };
       input.items.sort((a, b) => a.libro_id - b.libro_id);
 
       return repository.transaction(async (tx) => {
@@ -74,6 +89,47 @@ export function createLoansService(repository) {
         return { loan, rejected: Boolean(unavailable) };
       });
     },
+    async createDirectLoan(payload, staff) {
+      const input = directLoanSchema.parse(payload);
+      validateDueDate(input.fecha_limite);
+      input.items.sort((a, b) => a.libro_id - b.libro_id);
+
+      return repository.transaction(async (tx) => {
+        const client = await repository.upsertClient(tx, input.cliente);
+        if (await repository.hasOpenLoan(tx, client.id)) {
+          throw new ConflictError('El cliente tiene un préstamo activo o atrasado pendiente de devolución.', 'CLIENT_BLOCKED');
+        }
+
+        const ids = input.items.map((item) => item.libro_id);
+        const books = await repository.lockBooks(tx, ids);
+        if (books.length !== ids.length || books.some((book) => !book.activo)) {
+          throw new ValidationError('Uno o más libros ya no están disponibles en el catálogo.');
+        }
+        const committed = await repository.getCommittedByBook(tx, ids);
+        const unavailable = input.items.find((item) => {
+          const book = books.find((candidate) => Number(candidate.id) === item.libro_id);
+          return Number(book.cantidad_total) - (committed.get(item.libro_id) || 0) < item.cantidad;
+        });
+        if (unavailable) {
+          const book = books.find((candidate) => Number(candidate.id) === unavailable.libro_id);
+          throw new ConflictError(`No hay suficientes ejemplares disponibles de “${book?.titulo || 'el material seleccionado'}”.`, 'OUT_OF_STOCK');
+        }
+
+        const loan = await repository.createDirectLoan(tx, {
+          clientId: client.id,
+          staffId: staff.id,
+          dueDate: input.fecha_limite,
+        });
+        await repository.addDetails(tx, loan.id, input.items);
+        await repository.addMovement(tx, {
+          tipo: 'prestamo', tipo_actor: staff.rol, cuenta_personal_id: staff.id,
+          actor_nombre: staff.nombre_completo, cliente_id: client.id, prestamo_id: loan.id,
+          libro_id: input.items.length === 1 ? input.items[0].libro_id : null,
+          detalle: `Préstamo directo registrado y entregado. Fecha límite: ${input.fecha_limite}.`,
+        });
+        return loan;
+      });
+    },
     list: (filters) => repository.list(filters),
     getPublicStatus: async (code, identification) => {
       const loan = await repository.getPublicStatus(cleanText(code), normalizeDocument(identification));
@@ -81,9 +137,7 @@ export function createLoansService(repository) {
       return loan;
     },
     async approveAndDeliver(id, dueDate, staff) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dueDate || ''))) throw new ValidationError('La fecha límite es obligatoria.');
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil' }).format(new Date());
-      if (dueDate < today) throw new ValidationError('La fecha límite no puede ser anterior a hoy.');
+      validateDueDate(dueDate);
 
       return repository.transaction(async (tx) => {
         const loan = await repository.lockLoan(tx, id);
@@ -154,4 +208,3 @@ export function createLoansService(repository) {
     markOverdue: () => repository.markOverdue(),
   };
 }
-

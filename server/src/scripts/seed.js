@@ -5,6 +5,9 @@ import { createDatabase } from '../db/index.js';
 const name = process.env.ADMIN_NAME || 'Administrador Biblioteca';
 const user = process.env.ADMIN_USER || 'admin';
 const password = process.env.ADMIN_PASSWORD;
+const librarianName = process.env.LIBRARIAN_NAME || 'Bibliotecaria de Pruebas';
+const librarianUser = process.env.LIBRARIAN_USER || 'bibliotecaria';
+const librarianPassword = process.env.LIBRARIAN_PASSWORD;
 
 if (!password || password.length < 10) {
   throw new Error('Configure ADMIN_PASSWORD con al menos 10 caracteres antes de ejecutar el seed.');
@@ -24,7 +27,21 @@ try {
     [name, user, passwordHash],
   );
   console.log(`Cuenta administradora preparada: ${user}`);
+  if (librarianPassword) {
+    if (librarianPassword.length < 10) throw new Error('LIBRARIAN_PASSWORD debe tener al menos 10 caracteres.');
+    const librarianHash = await bcrypt.hash(librarianPassword, 12);
+    await db.query(
+      `insert into public.cuentas_personal (nombre_completo, usuario, password_hash, rol, estado)
+       values ($1, $2, $3, 'bibliotecario', true)
+       on conflict (lower(usuario)) do update
+         set nombre_completo = excluded.nombre_completo,
+             password_hash = excluded.password_hash,
+             rol = 'bibliotecario',
+             estado = true`,
+      [librarianName, librarianUser, librarianHash],
+    );
+    console.log(`Cuenta bibliotecaria de prueba preparada: ${librarianUser}`);
+  }
 } finally {
   await db.close();
 }
-

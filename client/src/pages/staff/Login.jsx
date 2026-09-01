@@ -16,7 +16,7 @@ export default function Login() {
     catch (requestError) { setError(requestError.response?.data?.message || 'No fue posible iniciar sesión.'); }
     finally { setLoading(false); }
   };
-  return <div className="bg-auth"><div className="auth-shell">
+  return <div className="bg-auth"><Link to="/" className="auth-back-button"><i className="fas fa-arrow-left" /><span>Volver al catálogo</span></Link><div className="auth-shell">
     <div className="auth-hero"><span className="badge rounded-pill"><i className="fas fa-book me-2" />Biblioteca Municipal</span><h2>Administramos conocimiento,<br />preservamos historias.</h2><p>Panel interno para solicitudes, préstamos, catálogo y movimientos.</p><div className="feature"><i className="fas fa-shield-halved" />Acceso seguro por rol</div><div className="feature"><i className="fas fa-right-left" />Circulación controlada</div><div className="feature"><i className="fas fa-clock-rotate-left" />Historial de movimientos</div></div>
     <div className="auth-form"><div className="text-center mb-4"><div className="auth-logo"><img src="/assets/logo.jpg" alt="Logo municipal" /></div><h4 className="mt-3 mb-1">Acceso del personal</h4><p className="text-muted">Biblioteca Municipal de Jipijapa</p></div>
       {error && <div className="alert alert-danger">{error}</div>}
@@ -25,4 +25,3 @@ export default function Login() {
     </div>
   </div></div>;
 }
-

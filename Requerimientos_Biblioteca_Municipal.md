@@ -7,7 +7,7 @@
 
 - No se requiere autenticación para el rol Cliente/Usuario. Cualquier persona puede consultar el catálogo y visualizar libros digitales sin registrarse.
 - Sí se requiere autenticación (login) para los roles Bibliotecario y Administrador.
-- Para solicitar un préstamo físico, el sistema solicita al cliente sus datos (nombre, identificación, contacto) en el momento de la solicitud, sin necesidad de crear una cuenta.
+- Para solicitar un préstamo físico, el sistema solicita nombre completo, cédula ecuatoriana y contacto en el momento de la solicitud, sin necesidad de crear una cuenta.
 - Los libros digitales son de acceso libre y sin restricciones, mediante un visor embebido dentro del sistema. No se permite la descarga directa del archivo.
 - El plazo de devolución de cada préstamo se define caso por caso por el bibliotecario al momento de aprobarlo (no es un valor fijo del sistema).
 - No existen sanciones ni multas por atraso. Si un cliente tiene un préstamo vencido sin devolver, el sistema únicamente bloquea nuevos préstamos para esa persona hasta que devuelva lo pendiente.
@@ -53,9 +53,9 @@ Datos que se solicitan al momento de pedir un préstamo físico. No implica crea
 
 | Campo | Descripción |
 |---|---|
-| ID Cliente | Identificador (cédula u otro documento) usado también para verificar historial de préstamos. |
-| Nombre completo | Nombre del solicitante. |
-| Contacto | Teléfono y/o correo electrónico. |
+| ID Cliente | Cédula ecuatoriana de exactamente 10 dígitos numéricos, usada también para verificar historial de préstamos. |
+| Nombre completo | Nombre del solicitante compuesto por letras. Admite espacios, apóstrofes, puntos y guiones, pero no números. |
+| Contacto | Teléfono ecuatoriano y/o correo electrónico. El teléfono admite celular nacional de 10 dígitos iniciado en `09` o fijo nacional de 9 dígitos con código de provincia. |
 
 ### 2.4 Cuenta de personal (Bibliotecario / Administrador)
 
@@ -131,6 +131,7 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 5. Consultar el catálogo completo: existencias, cantidad disponible y detalles.
 6. Verificar disponibilidad de libros específicos.
 7. Consultar qué clientes tienen libros físicos prestados actualmente, y quiénes están atrasados.
+8. Registrar un préstamo directamente cuando el cliente se presenta en la biblioteca, ingresando cédula, nombre, contacto, materiales, cantidades y fecha límite. La entrega queda activa en una sola operación.
 
 ### 3.3 Administrador (con autenticación)
 
@@ -150,6 +151,7 @@ Registra el historial funcional que el Administrador consulta como movimientos d
 - Un préstamo puede incluir más de un ejemplar de un mismo libro.
 - Un préstamo puede incluir varios libros distintos a la vez.
 - No se puede generar un nuevo préstamo si el cliente tiene préstamos pendientes por devolver (activos o atrasados).
+- El préstamo directo registrado por personal aplica las mismas validaciones de cliente, disponibilidad, concurrencia y bloqueo que una solicitud pública.
 - Si un préstamo supera su fecha límite de devolución sin haberse devuelto, cambia a estado "atrasado"; esto no genera multas, solo bloquea nuevos préstamos para ese cliente hasta que devuelva lo pendiente.
 - La cantidad disponible de un libro se recalcula automáticamente al registrar una solicitud válida (para apartar unidades), al rechazarla, al aprobar/entregar el préstamo y al registrar una devolución.
 - Al crear solicitudes concurrentes por el último ejemplar disponible, la primera solicitud válida en orden de fecha y hora aparta la unidad. Las solicitudes posteriores sin disponibilidad se rechazan automáticamente; no se crea una reserva o lista de espera.

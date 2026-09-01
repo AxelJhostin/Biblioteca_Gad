@@ -14,7 +14,7 @@ La base funcional incluye:
 - Solicitud de varios libros y cantidades sin crear cuenta de cliente.
 - Prioridad transaccional por orden de llegada para el último ejemplar.
 - Login para bibliotecarios y administradores.
-- Aprobación/entrega, rechazo y devoluciones parciales o completas.
+- Aprobación/entrega, préstamo directo presencial, rechazo y devoluciones parciales o completas.
 - Vencimientos y bloqueo de clientes con material activo o atrasado.
 - Gestión de catálogo, archivos digitales y cuentas del personal.
 - Restablecimiento de contraseña de bibliotecarios solo por administrador.
@@ -149,7 +149,7 @@ No combine `supabase db reset` y `npm run db:migrate` sobre la misma base sin
 revisar el historial: para desarrollo local, Supabase CLI administra las
 migraciones de `supabase/migrations`.
 
-### 4. Primera cuenta administradora
+### 4. Cuentas locales de prueba
 
 Defina en `server/.env`:
 
@@ -157,6 +157,9 @@ Defina en `server/.env`:
 ADMIN_NAME=Administrador Biblioteca
 ADMIN_USER=admin
 ADMIN_PASSWORD="una-contraseña-temporal-segura"
+LIBRARIAN_NAME=Bibliotecaria de Pruebas
+LIBRARIAN_USER=bibliotecaria
+LIBRARIAN_PASSWORD="Biblioteca#2026"
 ```
 
 Luego ejecute:
@@ -165,7 +168,14 @@ Luego ejecute:
 npm run db:seed
 ```
 
-La contraseña debe cambiarse por un valor seguro antes de publicar. El script es repetible y actualiza la cuenta administradora indicada.
+El script es repetible y prepara el administrador y, cuando se define `LIBRARIAN_PASSWORD`, la cuenta bibliotecaria local. En el entorno de desarrollo incluido se puede probar con:
+
+- Administrador: `admin` / `Admin#Cambiar2026`
+- Bibliotecaria: `bibliotecaria` / `Biblioteca#2026`
+
+Estas credenciales son únicamente para Docker local y deben reemplazarse u omitirse antes de publicar.
+
+El archivo `supabase/seed.sql` carga diez materiales, autores, clientes y solicitudes sintéticas. Supabase lo ejecuta al reconstruir la base; también puede aplicarse sobre una base local existente porque usa inserciones repetibles y no elimina datos manuales.
 
 ### 5. Desarrollo
 
@@ -192,7 +202,7 @@ npm run dev
 | `npm run test:coverage` | Ejecuta las suites con cobertura. |
 | `npm run qa` | Ejecuta pruebas y compilación de producción. |
 | `npm run db:migrate` | Aplica migraciones pendientes. |
-| `npm run db:seed` | Crea o restablece la cuenta administradora inicial. |
+| `npm run db:seed` | Crea o actualiza las cuentas locales configuradas. |
 
 ## Pruebas y estrategia de QA
 
@@ -260,6 +270,7 @@ No existe un campo editable de cantidad disponible.
 | `GET` | `/api/solicitudes/:codigo/consulta` | Público con identificación |
 | `POST` | `/api/auth/login` | Personal |
 | `GET` | `/api/prestamos` | Bibliotecario/Administrador |
+| `POST` | `/api/prestamos/directo` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/:id/aprobar-entregar` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/:id/rechazar` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/:id/devoluciones` | Bibliotecario/Administrador |
