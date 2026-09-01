@@ -48,7 +48,7 @@ export function createLoansRepository(db) {
     async getCommittedByBook(tx, ids) {
       const { rows } = await executor(tx).query(
         `select d.libro_id,
-                coalesce(sum(d.cantidad_solicitada - d.cantidad_devuelta), 0)::integer as cantidad_comprometida
+                coalesce(sum(greatest(coalesce(d.cantidad_aprobada, d.cantidad_solicitada) - d.cantidad_devuelta, 0)), 0)::integer as cantidad_comprometida
            from public.prestamo_detalles d
            join public.prestamos p on p.id = d.prestamo_id
           where d.libro_id = any($1::bigint[]) and p.estado in ('pendiente', 'listo_retiro', 'activo', 'atrasado')
@@ -79,9 +79,10 @@ export function createLoansRepository(db) {
     async addDetails(tx, loanId, items) {
       for (const item of items) {
         await executor(tx).query(
-          `insert into public.prestamo_detalles (prestamo_id, libro_id, cantidad_solicitada)
-           values ($1, $2, $3)`,
-          [loanId, item.libro_id, item.cantidad],
+          `insert into public.prestamo_detalles
+            (prestamo_id, libro_id, cantidad_solicitada, cantidad_aprobada, motivo_rechazo)
+           values ($1, $2, $3, $4, $5)`,
+          [loanId, item.libro_id, item.cantidad, item.cantidad_aprobada ?? null, item.motivo_rechazo || null],
         );
       }
     },
@@ -111,7 +112,10 @@ export function createLoansRepository(db) {
                 coalesce(json_agg(json_build_object(
                   'id', d.id, 'libro_id', d.libro_id, 'titulo', l.titulo,
                   'id_libro_texto', l.id_libro_texto, 'cantidad_solicitada', d.cantidad_solicitada,
-                  'cantidad_devuelta', d.cantidad_devuelta,
+                  'cantidad_aprobada', d.cantidad_aprobada, 'cantidad_devuelta', d.cantidad_devuelta,
+                  'motivo_rechazo', d.motivo_rechazo,
+                  'estado_revision', case when d.cantidad_aprobada is null then 'pendiente'
+                    when d.cantidad_aprobada = 0 then 'rechazado' else 'aprobado' end,
                   'tipo_material', l.tipo_material, 'tipo_material_otro', l.tipo_material_otro,
                   'genero', l.genero, 'genero_otro', l.genero_otro,
                   'anio_publicacion', l.anio_publicacion, 'descripcion', l.descripcion,
@@ -139,7 +143,12 @@ export function createLoansRepository(db) {
     async getClientStatus(code, clientId) {
       const { rows } = await db.query(
         `select p.codigo, p.estado, p.fecha_solicitud, p.fecha_entrega, p.fecha_limite, p.fecha_devolucion,
-                coalesce(json_agg(json_build_object('titulo', l.titulo, 'cantidad', d.cantidad_solicitada) order by d.id), '[]') as items
+                coalesce(json_agg(json_build_object(
+                  'titulo', l.titulo, 'cantidad_solicitada', d.cantidad_solicitada,
+                  'cantidad_aprobada', d.cantidad_aprobada, 'motivo_rechazo', d.motivo_rechazo,
+                  'estado_revision', case when d.cantidad_aprobada is null then 'pendiente'
+                    when d.cantidad_aprobada = 0 then 'rechazado' else 'aprobado' end
+                ) order by d.id), '[]') as items
            from public.prestamos p
            join public.prestamo_detalles d on d.prestamo_id = p.id
            join public.libros l on l.id = d.libro_id
@@ -164,12 +173,22 @@ export function createLoansRepository(db) {
       );
       return rows;
     },
-    approveForPickup(tx, loanId, staffId) {
+    reviewDetail(tx, detailId, approvedQuantity, reason) {
+      return executor(tx).query(
+        `update public.prestamo_detalles
+            set cantidad_aprobada = $2, motivo_rechazo = $3
+          where id = $1`,
+        [detailId, approvedQuantity, reason || null],
+      );
+    },
+    finishReview(tx, loanId, staffId, state, reason) {
       return executor(tx).query(
         `update public.prestamos
-            set estado = 'listo_retiro', bibliotecario_id = $2, fecha_aprobacion = now()
+            set estado = $3, bibliotecario_id = $2,
+                fecha_aprobacion = case when $3 = 'listo_retiro' then now() else null end,
+                motivo_rechazo = $4
           where id = $1`,
-        [loanId, staffId],
+        [loanId, staffId, state, reason || null],
       );
     },
     deliver(tx, loanId, staffId, dueDate) {
@@ -179,14 +198,6 @@ export function createLoansRepository(db) {
                 fecha_entrega = now(), fecha_limite = $3
           where id = $1`,
         [loanId, staffId, dueDate],
-      );
-    },
-    reject(tx, loanId, staffId, reason) {
-      return executor(tx).query(
-        `update public.prestamos
-            set estado = 'rechazado', bibliotecario_id = $2, motivo_rechazo = $3
-          where id = $1`,
-        [loanId, staffId, reason || null],
       );
     },
     updateReturnedQuantity(tx, detailId, amount) {

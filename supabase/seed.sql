@@ -76,8 +76,8 @@ select p.id, l.id, 1 from public.prestamos p cross join public.libros l
 where p.codigo = 'SOL-DEMO-PEND' and l.id_libro_texto = 'REV-JIP-001'
 on conflict (prestamo_id, libro_id) do nothing;
 
-insert into public.prestamo_detalles (prestamo_id, libro_id, cantidad_solicitada)
-select p.id, l.id, 1 from public.prestamos p cross join public.libros l
+insert into public.prestamo_detalles (prestamo_id, libro_id, cantidad_solicitada, cantidad_aprobada, motivo_rechazo)
+select p.id, l.id, 1, 0, 'Ejemplo de material rechazado.' from public.prestamos p cross join public.libros l
 where p.codigo = 'SOL-DEMO-RECH' and l.id_libro_texto = 'BJM-004'
 on conflict (prestamo_id, libro_id) do nothing;
 

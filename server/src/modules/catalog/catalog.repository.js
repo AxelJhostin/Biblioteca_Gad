@@ -1,7 +1,7 @@
 export function createCatalogRepository(db) {
   const availabilitySql = `
     greatest(0, l.cantidad_total - coalesce((
-      select sum(d.cantidad_solicitada - d.cantidad_devuelta)::integer
+      select sum(greatest(coalesce(d.cantidad_aprobada, d.cantidad_solicitada) - d.cantidad_devuelta, 0))::integer
       from public.prestamo_detalles d
       join public.prestamos p on p.id = d.prestamo_id
       where d.libro_id = l.id and p.estado in ('pendiente', 'listo_retiro', 'activo', 'atrasado')

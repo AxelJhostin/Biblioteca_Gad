@@ -6,8 +6,10 @@ import { AppError } from '../../src/core/errors.js';
 
 function dependencies() {
   const authenticate = (req, _res, next) => {
-    if (req.headers.authorization === 'Bearer staff') {
-      req.user = { id: 1, nombre_completo: 'Admin', rol: 'administrador' };
+    if (req.headers.authorization === 'Bearer staff' || req.headers.authorization === 'Bearer librarian') {
+      req.user = req.headers.authorization === 'Bearer librarian'
+        ? { id: 2, nombre_completo: 'María', rol: 'bibliotecario' }
+        : { id: 1, nombre_completo: 'Admin', rol: 'administrador' };
       return next();
     }
     next(new AppError('No autenticado', 401, 'UNAUTHENTICATED'));
@@ -45,7 +47,7 @@ function dependencies() {
     loansService: {
       createClientRequest: async () => ({ rejected: false, loan: { codigo: 'SOL-UNO', estado: 'pendiente' } }),
       getClientStatus: async () => ({ codigo: 'SOL-UNO', estado: 'pendiente' }),
-      list: async () => [], approve: async () => ({ estado: 'listo_retiro' }), deliver: async () => ({ estado: 'activo' }), reject: async () => ({}), registerReturn: async () => ({}),
+      list: async () => [{ id: 7, codigo: 'SOL-COMPARTIDA' }], review: async () => ({ estado: 'listo_retiro', resumen: { aprobados: 1, rechazados: 1 } }), deliver: async () => ({ estado: 'activo' }), registerReturn: async () => ({}),
       createDirectLoan: async () => ({ id: 5, codigo: 'SOL-DIRECTO', estado: 'activo' }),
     },
     adminService: { listStaff: async () => [], createBook: async () => ({}), updateBook: async () => ({}), uploadCover: async () => ({}), uploadDigital: async () => ({}), createStaff: async () => ({}), updateStaff: async () => ({}), resetPassword: async () => ({}) },
@@ -84,11 +86,13 @@ test('protege y entrega únicamente la actividad de la cuenta cliente', async ()
   assert.equal(response.body.items[0].codigo, 'SOL-UNO');
 });
 
-test('protege los módulos internos y permite una sesión válida', async () => {
+test('bibliotecario y administrador consultan el mismo historial completo de préstamos', async () => {
   const app = createApp({ dependencies: dependencies() });
   await request(app).get('/api/prestamos').expect(401);
-  const response = await request(app).get('/api/prestamos').set('Authorization', 'Bearer staff').expect(200);
-  assert.deepEqual(response.body.items, []);
+  const admin = await request(app).get('/api/prestamos').set('Authorization', 'Bearer staff').expect(200);
+  const librarian = await request(app).get('/api/prestamos').set('Authorization', 'Bearer librarian').expect(200);
+  assert.deepEqual(admin.body.items, [{ id: 7, codigo: 'SOL-COMPARTIDA' }]);
+  assert.deepEqual(librarian.body.items, admin.body.items);
 });
 
 test('permite al personal registrar un préstamo directo', async () => {
@@ -98,10 +102,13 @@ test('permite al personal registrar un préstamo directo', async () => {
   assert.equal(response.body.item.codigo, 'SOL-DIRECTO');
 });
 
-test('separa por HTTP la aprobación de la entrega física', async () => {
+test('permite revisión mixta por HTTP antes de la entrega física', async () => {
   const app = createApp({ dependencies: dependencies() });
-  const approval = await request(app).post('/api/prestamos/5/aprobar').set('Authorization', 'Bearer staff').expect(200);
+  const approval = await request(app).post('/api/prestamos/5/revisar').set('Authorization', 'Bearer staff').send({
+    items: [{ detalle_id: 1, cantidad_aprobada: 1 }, { detalle_id: 2, cantidad_aprobada: 0 }],
+  }).expect(200);
   assert.equal(approval.body.item.estado, 'listo_retiro');
+  assert.equal(approval.body.item.resumen.rechazados, 1);
   const delivery = await request(app).post('/api/prestamos/5/entregar').set('Authorization', 'Bearer staff').send({ fecha_limite: '2099-12-31' }).expect(200);
   assert.equal(delivery.body.item.estado, 'activo');
 });

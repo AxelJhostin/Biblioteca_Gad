@@ -21,7 +21,7 @@ export function createAdminRepository(db) {
     },
     async committedQuantity(tx, bookId) {
       const { rows } = await executor(tx).query(
-        `select coalesce(sum(d.cantidad_solicitada - d.cantidad_devuelta), 0)::integer as total
+        `select coalesce(sum(greatest(coalesce(d.cantidad_aprobada, d.cantidad_solicitada) - d.cantidad_devuelta, 0)), 0)::integer as total
            from public.prestamo_detalles d
            join public.prestamos p on p.id = d.prestamo_id
           where d.libro_id = $1 and p.estado in ('pendiente','listo_retiro','activo','atrasado')`,

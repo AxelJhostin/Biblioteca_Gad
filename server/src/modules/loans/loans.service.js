@@ -23,8 +23,8 @@ const clientSchema = z.object({
 const itemsSchema = z.object({
   items: z.array(z.object({
     libro_id: z.coerce.number().int().positive(),
-    cantidad: z.coerce.number().int().positive().max(100),
-  })).min(1, 'Añade al menos un libro antes de enviar la solicitud.').max(20, 'Una solicitud admite hasta 20 libros.'),
+    cantidad: z.coerce.number().int().positive(),
+  })).min(1, 'Añade al menos un libro antes de enviar la solicitud.'),
 }).superRefine((value, ctx) => {
   if (new Set(value.items.map((item) => item.libro_id)).size !== value.items.length) {
     ctx.addIssue({ code: 'custom', path: ['items'], message: 'Cada libro debe aparecer una sola vez.' });
@@ -42,6 +42,20 @@ const returnSchema = z.object({
     detalle_id: z.coerce.number().int().positive(),
     cantidad: z.coerce.number().int().positive(),
   })).min(1),
+});
+
+const reviewSchema = z.object({
+  items: z.array(z.object({
+    detalle_id: z.coerce.number().int().positive(),
+    cantidad_aprobada: z.coerce.number().int().nonnegative(),
+    motivo_rechazo: z.string().optional().default('').transform(cleanText).pipe(
+      z.string().max(500, 'La observación no puede superar 500 caracteres.'),
+    ),
+  })).min(1, 'Debe revisar todos los materiales pendientes.'),
+}).superRefine((value, ctx) => {
+  if (new Set(value.items.map((item) => item.detalle_id)).size !== value.items.length) {
+    ctx.addIssue({ code: 'custom', path: ['items'], message: 'Cada material debe revisarse una sola vez.' });
+  }
 });
 
 const directLoanSchema = requestSchema.and(z.object({
@@ -69,29 +83,50 @@ export function createLoansService(repository) {
 
         const ids = input.items.map((item) => item.libro_id);
         const books = await repository.lockBooks(tx, ids);
-        if (books.length !== ids.length || books.some((book) => !book.activo)) {
-          throw new ValidationError('Uno o más libros ya no están disponibles en el catálogo.');
-        }
+        if (books.length !== ids.length) throw new ValidationError('Uno o más libros ya no existen en el catálogo.');
         const committed = await repository.getCommittedByBook(tx, ids);
-        const unavailable = input.items.find((item) => {
+        const reviewedItems = input.items.map((item) => {
           const book = books.find((candidate) => Number(candidate.id) === item.libro_id);
-          return Number(book.cantidad_total) - (committed.get(item.libro_id) || 0) < item.cantidad;
+          const unavailable = !book.activo || Number(book.cantidad_total) - (committed.get(item.libro_id) || 0) < item.cantidad;
+          return {
+            ...item,
+            cantidad_aprobada: unavailable ? 0 : null,
+            motivo_rechazo: unavailable
+              ? book.activo ? 'Rechazo automático por falta de disponibilidad.' : 'Rechazo automático porque el material ya no está activo.'
+              : null,
+          };
         });
-
-        const state = unavailable ? 'rechazado' : 'pendiente';
-        const reason = unavailable ? 'Rechazo automático por falta de disponibilidad.' : null;
+        const unavailable = reviewedItems.filter((item) => item.cantidad_aprobada === 0);
+        const pending = reviewedItems.filter((item) => item.cantidad_aprobada === null);
+        const state = pending.length ? 'pendiente' : 'rechazado';
+        const reason = pending.length ? null : 'Todos los materiales fueron rechazados automáticamente por falta de disponibilidad.';
         const loan = await repository.createLoan(tx, { clientId: client.id, state, reason });
-        await repository.addDetails(tx, loan.id, input.items);
+        await repository.addDetails(tx, loan.id, reviewedItems);
         await repository.addMovement(tx, {
-          tipo: unavailable ? 'rechazo_solicitud' : 'prestamo',
+          tipo: pending.length ? 'prestamo' : 'rechazo_solicitud',
           tipo_actor: 'cliente',
           cliente_id: client.id,
           actor_nombre: client.nombre_completo,
-          libro_id: unavailable?.libro_id || (input.items.length === 1 ? input.items[0].libro_id : null),
+          libro_id: reviewedItems.length === 1 ? reviewedItems[0].libro_id : null,
           prestamo_id: loan.id,
-          detalle: unavailable ? reason : 'Solicitud de préstamo registrada.',
+          detalle: pending.length
+            ? `Solicitud registrada con ${pending.length} material(es) pendiente(s) de revisión${unavailable.length ? ` y ${unavailable.length} rechazado(s) automáticamente` : ''}.`
+            : reason,
         });
-        return { loan, rejected: Boolean(unavailable) };
+        for (const item of unavailable) {
+          await repository.addMovement(tx, {
+            tipo: 'rechazo_solicitud', tipo_actor: 'cliente', cliente_id: client.id,
+            actor_nombre: client.nombre_completo, libro_id: item.libro_id, prestamo_id: loan.id,
+            detalle: item.motivo_rechazo,
+          });
+        }
+        return {
+          loan,
+          rejected: !pending.length,
+          partial: Boolean(pending.length && unavailable.length),
+          pendingCount: pending.length,
+          rejectedCount: unavailable.length,
+        };
       });
     },
     async createDirectLoan(payload, staff) {
@@ -125,7 +160,9 @@ export function createLoansService(repository) {
           staffId: staff.id,
           dueDate: input.fecha_limite,
         });
-        await repository.addDetails(tx, loan.id, input.items);
+        await repository.addDetails(tx, loan.id, input.items.map((item) => ({
+          ...item, cantidad_aprobada: item.cantidad, motivo_rechazo: null,
+        })));
         await repository.addMovement(tx, {
           tipo: 'prestamo', tipo_actor: staff.rol, cuenta_personal_id: staff.id,
           actor_nombre: staff.nombre_completo, cliente_id: client.id, prestamo_id: loan.id,
@@ -141,23 +178,61 @@ export function createLoansService(repository) {
       if (!loan) throw new NotFoundError('No se encontró una solicitud con esos datos.');
       return loan;
     },
-    async approve(id, staff) {
+    async review(id, payload, staff) {
+      const input = reviewSchema.parse(payload);
       return repository.transaction(async (tx) => {
         const loan = await repository.lockLoan(tx, id);
         if (!loan) throw new NotFoundError('Solicitud no encontrada.');
         if (loan.estado !== 'pendiente') throw new ConflictError('La solicitud ya fue procesada.', 'LOAN_ALREADY_PROCESSED');
-        if (await repository.hasOpenLoan(tx, loan.cliente_id, loan.id)) {
+        const details = await repository.getDetails(tx, loan.id, true);
+        const pendingDetails = details.filter((detail) => detail.cantidad_aprobada === null);
+        const expectedIds = new Set(pendingDetails.map((detail) => Number(detail.id)));
+        if (input.items.length !== pendingDetails.length || input.items.some((item) => !expectedIds.has(item.detalle_id))) {
+          throw new ValidationError('Debe decidir sobre todos los materiales pendientes de la solicitud.');
+        }
+        for (const decision of input.items) {
+          const detail = pendingDetails.find((candidate) => Number(candidate.id) === decision.detalle_id);
+          if (decision.cantidad_aprobada > Number(detail.cantidad_solicitada)) {
+            throw new ValidationError(`No puede aprobar más unidades de “${detail.titulo}” que las solicitadas.`);
+          }
+        }
+        const approved = input.items.filter((item) => item.cantidad_aprobada > 0);
+        if (approved.length && await repository.hasOpenLoan(tx, loan.cliente_id, loan.id)) {
           throw new ConflictError('El cliente ya tiene otro préstamo listo para retiro, activo o atrasado.', 'CLIENT_BLOCKED');
         }
-        const details = await repository.getDetails(tx, loan.id);
-        await repository.approveForPickup(tx, loan.id, staff.id);
-        await repository.addMovement(tx, {
-          tipo: 'prestamo', tipo_actor: staff.rol, cuenta_personal_id: staff.id,
-          actor_nombre: staff.nombre_completo, prestamo_id: loan.id,
-          libro_id: details.length === 1 ? details[0].libro_id : null,
-          detalle: 'Solicitud aprobada y lista para retiro.',
-        });
-        return { ...loan, estado: 'listo_retiro', bibliotecario_id: staff.id };
+        if (approved.length) {
+          const approvedBookIds = approved.map((decision) => Number(
+            pendingDetails.find((detail) => Number(detail.id) === decision.detalle_id).libro_id,
+          ));
+          await repository.lockBooks(tx, approvedBookIds);
+        }
+        for (const decision of input.items) {
+          const detail = pendingDetails.find((candidate) => Number(candidate.id) === decision.detalle_id);
+          const reduced = decision.cantidad_aprobada > 0 && decision.cantidad_aprobada < Number(detail.cantidad_solicitada);
+          const reviewNote = decision.cantidad_aprobada === 0 || reduced ? decision.motivo_rechazo : '';
+          await repository.reviewDetail(tx, detail.id, decision.cantidad_aprobada, reviewNote);
+          await repository.addMovement(tx, {
+            tipo: decision.cantidad_aprobada > 0 ? 'prestamo' : 'rechazo_solicitud',
+            tipo_actor: staff.rol, cuenta_personal_id: staff.id,
+            actor_nombre: staff.nombre_completo, prestamo_id: loan.id, libro_id: detail.libro_id,
+            detalle: decision.cantidad_aprobada > 0
+              ? `Aprobadas ${decision.cantidad_aprobada} de ${detail.cantidad_solicitada} unidad(es) de “${detail.titulo}”${reduced && reviewNote ? `. Observación: ${reviewNote}` : ''}.`
+              : `Material rechazado: “${detail.titulo}”${reviewNote ? `. Motivo: ${reviewNote}` : '.'}`,
+          });
+        }
+        const state = approved.length ? 'listo_retiro' : 'rechazado';
+        await repository.finishReview(tx, loan.id, staff.id, state,
+          approved.length ? null : 'Todos los materiales fueron rechazados por el personal.');
+        return {
+          ...loan,
+          estado: state,
+          bibliotecario_id: staff.id,
+          resumen: {
+            aprobados: approved.length,
+            rechazados: input.items.length - approved.length,
+            unidades_aprobadas: approved.reduce((sum, item) => sum + item.cantidad_aprobada, 0),
+          },
+        };
       });
     },
     async deliver(id, dueDate, staff) {
@@ -170,7 +245,8 @@ export function createLoansService(repository) {
         if (await repository.hasOpenLoan(tx, loan.cliente_id, loan.id)) {
           throw new ConflictError('El cliente ya tiene otro préstamo listo para retiro, activo o atrasado.', 'CLIENT_BLOCKED');
         }
-        const details = await repository.getDetails(tx, loan.id);
+        const details = (await repository.getDetails(tx, loan.id)).filter((detail) => Number(detail.cantidad_aprobada) > 0);
+        if (!details.length) throw new ConflictError('El préstamo no tiene materiales aprobados para entregar.', 'INVALID_LOAN_STATE');
         await repository.lockBooks(tx, details.map((detail) => Number(detail.libro_id)));
         await repository.deliver(tx, loan.id, staff.id, dueDate);
         await repository.addMovement(tx, {
@@ -180,22 +256,6 @@ export function createLoansService(repository) {
           detalle: `Material entregado. Fecha límite: ${dueDate}.`,
         });
         return { ...loan, estado: 'activo', fecha_limite: dueDate, bibliotecario_id: staff.id };
-      });
-    },
-    async reject(id, reason, staff) {
-      return repository.transaction(async (tx) => {
-        const loan = await repository.lockLoan(tx, id);
-        if (!loan) throw new NotFoundError('Solicitud no encontrada.');
-        if (loan.estado !== 'pendiente') throw new ConflictError('La solicitud ya fue procesada.', 'LOAN_ALREADY_PROCESSED');
-        const details = await repository.getDetails(tx, loan.id);
-        await repository.reject(tx, loan.id, staff.id, cleanText(reason));
-        await repository.addMovement(tx, {
-          tipo: 'rechazo_solicitud', tipo_actor: staff.rol, cuenta_personal_id: staff.id,
-          actor_nombre: staff.nombre_completo, prestamo_id: loan.id,
-          libro_id: details.length === 1 ? details[0].libro_id : null,
-          detalle: cleanText(reason) || 'Solicitud rechazada por el personal.',
-        });
-        return { ...loan, estado: 'rechazado' };
       });
     },
     async registerReturn(id, payload, staff) {
@@ -208,7 +268,8 @@ export function createLoansService(repository) {
         for (const item of input.items) {
           const detail = details.find((candidate) => Number(candidate.id) === item.detalle_id);
           if (!detail) throw new ValidationError('Una línea no pertenece al préstamo.');
-          if (Number(detail.cantidad_devuelta) + item.cantidad > Number(detail.cantidad_solicitada)) {
+          if (Number(detail.cantidad_aprobada) <= 0) throw new ValidationError('No puede devolver un material que no fue aprobado.');
+          if (Number(detail.cantidad_devuelta) + item.cantidad > Number(detail.cantidad_aprobada)) {
             throw new ValidationError(`La devolución de “${detail.titulo}” supera la cantidad pendiente.`);
           }
         }
@@ -222,7 +283,8 @@ export function createLoansService(repository) {
           });
           detail.cantidad_devuelta = Number(detail.cantidad_devuelta) + item.cantidad;
         }
-        const complete = details.every((detail) => Number(detail.cantidad_devuelta) === Number(detail.cantidad_solicitada));
+        const approvedDetails = details.filter((detail) => Number(detail.cantidad_aprobada) > 0);
+        const complete = approvedDetails.every((detail) => Number(detail.cantidad_devuelta) === Number(detail.cantidad_aprobada));
         const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil' }).format(new Date());
         const state = complete ? 'devuelto' : String(loan.fecha_limite) < today ? 'atrasado' : 'activo';
         await repository.setLoanState(tx, loan.id, state);

@@ -276,7 +276,19 @@ Para cambios de base de datos también se debe validar la migración sobre una b
 
 ### Concurrencia del último ejemplar
 
-La creación de solicitudes se ejecuta dentro de una transacción. Los libros se bloquean con `FOR UPDATE` en orden ascendente de ID; después se calcula el material ya comprometido por solicitudes pendientes, listas para retiro, préstamos activos y atrasados. Esto garantiza que la primera transacción válida aparte la unidad y que las posteriores se registren como rechazadas sin disponibilidad negativa.
+La creación de solicitudes se ejecuta dentro de una transacción. Los libros se bloquean con `FOR UPDATE` en orden ascendente de ID; después se calcula el material ya comprometido por solicitudes pendientes, listas para retiro, préstamos activos y atrasados. Esto garantiza que la primera transacción válida aparte cada unidad y que las líneas posteriores sin disponibilidad se rechacen automáticamente, sin disponibilidad negativa.
+
+Una solicitud puede contener cualquier cantidad de títulos distintos (no hay un límite funcional). Cada título es una línea independiente: una solicitud puede conservar líneas pendientes y otras rechazadas automáticamente por falta de stock. El límite de tamaño del cuerpo HTTP sigue siendo una protección técnica contra abuso, no una regla bibliotecaria.
+
+### Revisión por material
+
+Bibliotecario y Administrador ven el mismo historial completo de solicitudes y préstamos, sin importar qué cuenta de personal los registró. En cada solicitud pendiente deben decidir todas las líneas de una vez:
+
+- aprobar la cantidad completa;
+- aprobar una cantidad menor y registrar una observación opcional;
+- rechazar solo ese material, con observación opcional.
+
+Si se aprueba al menos una línea, el registro queda `listo_retiro` y **Mi cuenta** notifica exclusivamente los materiales y cantidades aprobados. Si se rechazan todas, el registro queda `rechazado`. Las unidades rechazadas o no aprobadas se liberan de inmediato. Los préstamos directos permanecen atómicos: por tratarse de una entrega presencial inmediata, si falta stock de una de sus líneas no se crea un préstamo parcial.
 
 ### Disponibilidad
 
@@ -342,9 +354,8 @@ No existe un campo editable de cantidad disponible.
 | `POST` | `/api/auth/login` | Personal |
 | `GET` | `/api/prestamos` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/directo` | Bibliotecario/Administrador |
-| `POST` | `/api/prestamos/:id/aprobar` | Bibliotecario/Administrador |
+| `POST` | `/api/prestamos/:id/revisar` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/:id/entregar` | Bibliotecario/Administrador |
-| `POST` | `/api/prestamos/:id/rechazar` | Bibliotecario/Administrador |
 | `POST` | `/api/prestamos/:id/devoluciones` | Bibliotecario/Administrador |
 | `POST/PATCH` | `/api/admin/libros[/:id]` | Administrador |
 | `POST` | `/api/admin/libros/:id/portada` | Administrador |
@@ -415,5 +426,5 @@ Antes de publicar el sistema para uso institucional:
 3. Configurar secretos y contraseñas nuevos en Supabase y Render; no reutilizar las credenciales locales de prueba.
 4. Desplegar la API en Render y configurar su URL como `VITE_API_URL` en Vercel.
 5. Confirmar `CLIENT_URL`, CORS, Storage privado y acceso a los archivos digitales.
-6. Probar con los tres roles el recorrido de solicitud, aprobación, retiro, entrega y devolución.
+6. Probar con los tres roles el recorrido de solicitud, revisión mixta por material, retiro, entrega y devolución; comprobar que ambos roles internos ven el mismo historial completo.
 7. Entregar las credenciales definitivas únicamente al responsable designado por el Municipio.

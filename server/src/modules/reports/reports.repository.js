@@ -45,7 +45,7 @@ export function createReportsRepository(db) {
                 ), 'Autor no registrado') as autores
            from public.libros l
            left join lateral (
-             select coalesce(sum(d.cantidad_solicitada - d.cantidad_devuelta), 0)::integer as comprometida
+             select coalesce(sum(greatest(coalesce(d.cantidad_aprobada, d.cantidad_solicitada) - d.cantidad_devuelta, 0)), 0)::integer as comprometida
              from public.prestamo_detalles d
              join public.prestamos p on p.id = d.prestamo_id
              where d.libro_id = l.id and p.estado in ('pendiente', 'listo_retiro', 'activo', 'atrasado')
@@ -74,12 +74,15 @@ export function createReportsRepository(db) {
                 c.identificacion, c.nombre_completo, c.telefono, c.correo,
                 coalesce(cp.nombre_completo, 'Sin asignar') as bibliotecario_nombre,
                 coalesce(string_agg(
-                  concat(l.id_libro_texto, ' - ', l.titulo, ' (', d.cantidad_solicitada,
+                  concat(l.id_libro_texto, ' - ', l.titulo, ' (sol. ', d.cantidad_solicitada,
+                    '; ', case when d.cantidad_aprobada is null then 'pendiente'
+                      when d.cantidad_aprobada = 0 then 'rechazado'
+                      else concat('aprob. ', d.cantidad_aprobada) end,
                     case when d.cantidad_devuelta > 0 then concat('; devueltos ', d.cantidad_devuelta) else '' end, ')'),
                   ' | ' order by d.id
                 ), 'Sin materiales') as materiales,
                 coalesce(sum(d.cantidad_solicitada), 0)::integer as unidades_solicitadas,
-                coalesce(sum(d.cantidad_solicitada - d.cantidad_devuelta), 0)::integer as unidades_pendientes
+                coalesce(sum(greatest(coalesce(d.cantidad_aprobada, d.cantidad_solicitada) - d.cantidad_devuelta, 0)), 0)::integer as unidades_pendientes
            from public.prestamos p
            join public.clientes c on c.id = p.cliente_id
            left join public.cuentas_personal cp on cp.id = p.bibliotecario_id

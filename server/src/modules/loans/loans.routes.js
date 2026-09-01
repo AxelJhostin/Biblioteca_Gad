@@ -14,8 +14,13 @@ export function createPublicLoanRoutes({ service, authenticateClient }) {
       code: result.rejected ? 'OUT_OF_STOCK' : undefined,
       message: result.rejected
         ? 'La solicitud fue rechazada automáticamente porque el material dejó de estar disponible.'
-        : 'Solicitud registrada correctamente.',
-      solicitud: { codigo: result.loan.codigo, estado: result.loan.estado },
+        : result.partial
+          ? 'Solicitud registrada. Algunos materiales quedaron rechazados automáticamente por falta de disponibilidad.'
+          : 'Solicitud registrada correctamente.',
+      solicitud: {
+        codigo: result.loan.codigo, estado: result.loan.estado,
+        materiales_pendientes: result.pendingCount, materiales_rechazados: result.rejectedCount,
+      },
     });
   }));
 
@@ -34,17 +39,19 @@ export function createStaffLoanRoutes({ service, authenticate }) {
     const item = await service.createDirectLoan(req.body, req.user);
     res.status(201).json({ ok: true, message: 'Préstamo directo registrado y entregado.', item });
   }));
-  router.post('/:id/aprobar', asyncHandler(async (req, res) => {
-    const item = await service.approve(req.params.id, req.user);
-    res.json({ ok: true, message: 'Solicitud aprobada y lista para retiro.', item });
+  router.post('/:id/revisar', asyncHandler(async (req, res) => {
+    const item = await service.review(req.params.id, req.body, req.user);
+    res.json({
+      ok: true,
+      message: item.estado === 'listo_retiro'
+        ? 'Revisión guardada. Los materiales aprobados están listos para retiro.'
+        : 'Todos los materiales fueron rechazados.',
+      item,
+    });
   }));
   router.post('/:id/entregar', asyncHandler(async (req, res) => {
     const item = await service.deliver(req.params.id, req.body.fecha_limite, req.user);
     res.json({ ok: true, message: 'Entrega registrada.', item });
-  }));
-  router.post('/:id/rechazar', asyncHandler(async (req, res) => {
-    const item = await service.reject(req.params.id, req.body.motivo, req.user);
-    res.json({ ok: true, message: 'Solicitud rechazada.', item });
   }));
   router.post('/:id/devoluciones', asyncHandler(async (req, res) => {
     const item = await service.registerReturn(req.params.id, req.body, req.user);

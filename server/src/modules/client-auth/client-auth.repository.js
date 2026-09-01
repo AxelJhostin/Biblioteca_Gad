@@ -124,7 +124,11 @@ export function createClientAuthRepository(db) {
                   'id', d.id, 'libro_id', l.id, 'titulo', l.titulo,
                   'id_libro_texto', l.id_libro_texto,
                   'cantidad_solicitada', d.cantidad_solicitada,
-                  'cantidad_devuelta', d.cantidad_devuelta
+                  'cantidad_aprobada', d.cantidad_aprobada,
+                  'cantidad_devuelta', d.cantidad_devuelta,
+                  'motivo_rechazo', d.motivo_rechazo,
+                  'estado_revision', case when d.cantidad_aprobada is null then 'pendiente'
+                    when d.cantidad_aprobada = 0 then 'rechazado' else 'aprobado' end
                 ) order by d.id) filter (where d.id is not null), '[]') as detalles
            from public.prestamos p
            left join public.prestamo_detalles d on d.prestamo_id = p.id
@@ -145,7 +149,11 @@ export function createClientAuthRepository(db) {
                   'id', d.id, 'libro_id', l.id, 'titulo', l.titulo,
                   'id_libro_texto', l.id_libro_texto, 'tipo_material', l.tipo_material,
                   'cantidad_solicitada', d.cantidad_solicitada,
-                  'cantidad_devuelta', d.cantidad_devuelta
+                  'cantidad_aprobada', d.cantidad_aprobada,
+                  'cantidad_devuelta', d.cantidad_devuelta,
+                  'motivo_rechazo', d.motivo_rechazo,
+                  'estado_revision', case when d.cantidad_aprobada is null then 'pendiente'
+                    when d.cantidad_aprobada = 0 then 'rechazado' else 'aprobado' end
                 ) order by d.id) filter (where d.id is not null), '[]') as detalles
            from public.prestamos p
            left join public.prestamo_detalles d on d.prestamo_id = p.id
